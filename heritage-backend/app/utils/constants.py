@@ -2,8 +2,8 @@ from __future__ import annotations
 
 """Module-level constants used across the app."""
 
-CLASS_NAMES: list[str] = ["Undamaged", "Partial Damage", "Damaged"]
-NUM_CLASSES: int = 3
+CLASS_NAMES: list[str] = ["STABLE", "MINOR", "MODERATE", "CRITICAL"]
+NUM_CLASSES: int = 4
 DEFAULT_IMAGE_SIZE: tuple[int, int] = (224, 224)
 IMAGENET_MEAN: list[float] = [0.485, 0.456, 0.406]
 IMAGENET_STD: list[float] = [0.229, 0.224, 0.225]

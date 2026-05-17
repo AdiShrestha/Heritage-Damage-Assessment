@@ -63,5 +63,6 @@ class PredictionService:
             gradcam_image_base64=gradcam_b64,
             inference_time_ms=round(inference_time_ms, 2),
             image_dimensions=ImageService.get_dimensions(image),
+            detections=result.detections if result.detections else None,
             timestamp=datetime.utcnow(),
         )
