@@ -13,6 +13,7 @@ logger = get_logger(__name__)
 
 try:
     from ultralytics import YOLO
+
     YOLO_AVAILABLE = True
 except ImportError:
     YOLO_AVAILABLE = False
@@ -35,7 +36,9 @@ class YOLOPredictor(BasePredictor):
 
         try:
             if weights_path is None or not weights_path.exists():
-                logger.warning("YOLO weights not found at %s. Predictor inactive.", weights_path)
+                logger.warning(
+                    "YOLO weights not found at %s. Predictor inactive.", weights_path
+                )
                 self._loaded = False
                 return
 
@@ -91,10 +94,16 @@ class YOLOPredictor(BasePredictor):
                 confidence = float(result.probs.top1conf.cpu().item())
 
             # Fallback path: if model returns detection boxes, aggregate scores by class.
-            elif getattr(result, "boxes", None) is not None and result.boxes is not None and len(result.boxes) > 0:
+            elif (
+                getattr(result, "boxes", None) is not None
+                and result.boxes is not None
+                and len(result.boxes) > 0
+            ):
                 scores: dict[int, float] = {}
                 total = 0.0
-                for conf, cls_id in zip(result.boxes.conf.cpu().numpy(), result.boxes.cls.cpu().numpy()):
+                for conf, cls_id in zip(
+                    result.boxes.conf.cpu().numpy(), result.boxes.cls.cpu().numpy()
+                ):
                     idx = int(cls_id)
                     score = float(conf)
                     scores[idx] = scores.get(idx, 0.0) + score
