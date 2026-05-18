@@ -16,6 +16,7 @@ class PredictionResult:
     confidence: float
     class_probabilities: dict[str, float]
     gradcam_image: Any | None
+    detections: list[dict[str, Any]] | None = None
 
 
 class BasePredictor(ABC):
