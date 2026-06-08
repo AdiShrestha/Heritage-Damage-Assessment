@@ -3,7 +3,7 @@ from __future__ import annotations
 """FastAPI application factory and startup/shutdown lifecycle."""
 
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import AsyncGenerator
 
 from fastapi import FastAPI
@@ -17,7 +17,7 @@ from app.middleware.logging_middleware import LoggingMiddleware
 from app.middleware.request_id import RequestIDMiddleware
 from app.api.router import api_router
 
-APP_START_TIME = datetime.utcnow()
+APP_START_TIME = datetime.now(UTC)
 
 
 @asynccontextmanager
