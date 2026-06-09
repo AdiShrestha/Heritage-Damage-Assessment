@@ -12,11 +12,14 @@ function formatTimestamp(timestamp) {
 
 export function ResultCard({ result, originalSrc }) {
   return (
-    <div className="rounded-xl border border-stone-custom-light bg-white p-5 shadow-card">
+    <div className="heritage-card p-5">
       <div className="flex flex-col gap-2 border-b border-stone-custom-light pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-semibold tracking-tight text-text">Assessment Result</h2>
+        <h2 className="font-display text-lg font-semibold tracking-tight text-text">Assessment Result</h2>
         <p className="text-sm text-text-muted">
-          Inference · {toMs(result.inference_time_ms)} · {result.model_used}
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#D4A04A]" />
+            {toMs(result.inference_time_ms)} · {result.model_used}
+          </span>
         </p>
       </div>
 
@@ -24,11 +27,15 @@ export function ResultCard({ result, originalSrc }) {
         <DamageLabel label={result.predicted_class} confidence={result.confidence} size="lg" />
       </div>
 
-      <div className="my-5 border-t border-stone-custom-light" />
+      <div className="pagoda-divider my-5">
+        <div className="pagoda-divider-dot" />
+      </div>
 
       <ConfidenceChart probabilities={result.class_probabilities} />
 
-      <div className="my-5 border-t border-stone-custom-light" />
+      <div className="pagoda-divider my-5">
+        <div className="pagoda-divider-dot" />
+      </div>
 
       <GradCamViewer originalSrc={originalSrc} gradcamBase64={result.gradcam_image_base64} />
 

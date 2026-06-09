@@ -27,7 +27,7 @@ const details = {
 
 function SkeletonCard() {
   return (
-    <div className="rounded-xl border border-stone-custom-light bg-white p-5 shadow-card">
+    <div className="heritage-card p-5">
       <div className="h-6 w-2/3 animate-pulse rounded bg-stone-200" />
       <div className="mt-4 h-5 w-32 animate-pulse rounded bg-stone-200" />
       <div className="mt-3 h-4 w-full animate-pulse rounded bg-stone-200" />
@@ -44,8 +44,15 @@ export default function ModelsPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-text">Available Models</h1>
-        <p className="mt-2 text-sm text-text-muted">Models currently registered in the inference server.</p>
+        <div className="flex items-center gap-3 mb-1">
+          <svg width="24" height="24" viewBox="0 0 64 64" fill="none" aria-hidden="true" className="text-[#A63A2A]">
+            <rect x="8" y="24" width="48" height="36" rx="2" fill="currentColor" opacity="0.85" />
+            <rect x="14" y="14" width="36" height="12" rx="2" fill="currentColor" opacity="0.7" />
+            <rect x="20" y="6" width="24" height="10" rx="2" fill="currentColor" opacity="0.55" />
+          </svg>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-text">Available Models</h1>
+        </div>
+        <p className="ml-[52px] text-sm text-text-muted">Models currently registered in the inference server.</p>
       </div>
 
       {error ? (
@@ -60,37 +67,41 @@ export default function ModelsPage() {
       ) : (
         <div className="grid gap-5 md:grid-cols-2">
           {models.map((model) => {
-            const meta = details[model.name] || details.mock;
-            const status = model.loaded ? 'ok' : 'error';
+              const meta = details[model.name] || details.mock;
+              const status = model.loaded ? 'ok' : 'error';
 
-            return (
-              <article key={model.name} className="rounded-xl border border-stone-custom-light bg-white p-5 shadow-card">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-xl font-semibold tracking-tight text-text">{model.name}</h2>
-                    <p className="mt-2 text-sm leading-6 text-text-muted">{meta.description}</p>
+              return (
+                <article key={model.name} className="heritage-card p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="font-display text-xl font-semibold tracking-tight text-text">{model.name}</h2>
+                      <p className="mt-2 text-sm leading-6 text-text-muted">{meta.description}</p>
+                    </div>
+                    <StatusBadge status={status} label={model.loaded ? 'Loaded' : 'Not ready'} />
                   </div>
-                  <StatusBadge status={status} label={model.loaded ? 'Loaded' : 'Not ready'} />
-                </div>
 
-                <div className="mt-5 space-y-3 text-sm text-text-muted">
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Version</span>
-                    <span className="font-medium text-text">{model.version}</span>
+                  <div className="pagoda-divider my-5">
+                    <div className="pagoda-divider-dot" />
                   </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Parameters</span>
-                    <span className="font-medium text-text">{meta.parameters}</span>
+
+                  <div className="space-y-3 text-sm text-text-muted">
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Version</span>
+                      <span className="font-medium text-text">{model.version}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Parameters</span>
+                      <span className="font-medium text-text">{meta.parameters}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Input size</span>
+                      <span className="font-medium text-text">{meta.inputSize}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span>Input size</span>
-                    <span className="font-medium text-text">{meta.inputSize}</span>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                </article>
+              );
+            })}
+          </div>
       )}
     </div>
   );
