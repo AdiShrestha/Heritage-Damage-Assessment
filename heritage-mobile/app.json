@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Heritage Assessment",
+    "slug": "heritage-assessment",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#6B3A2A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ku.heritageassessment"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#6B3A2A"
+      },
+      "package": "com.ku.heritageassessment"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Select a heritage structure image for damage assessment."
+        }
+      ],
+      "expo-asset"
+    ]
+  }
+}
