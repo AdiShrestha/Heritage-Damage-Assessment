@@ -1,32 +1,110 @@
+# OS Files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE & Editors
 .vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+.vim/
+.emacs*
+*~
 
 # Python
 __pycache__/
 *.py[cod]
+*.egg
+*.egg-info/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+*.cover
+.hypothesis/
+site-packages/
+
+# Virtual Environments
 .venv/
 venv/
-env/
 ENV/
+env/
 .python-version
-
-# Environment files
 .env
 .env.*
 !.env.example
 
-# Build / coverage artifacts
+# Build & Distribution
 build/
 dist/
+*.egg-info/
+*.whl
+.eggs/
+
+# Coverage & Testing
 htmlcov/
 .coverage
 .coverage.*
+.tox/
+*.cover
 
-# Model artifacts
+# Jupyter Notebooks
+.ipynb_checkpoints/
+.jupyter/
+.ipython/
+*.ipynb_checkpoints
+*/.ipynb_checkpoints/
+
+# Model & Weights
 weights/
 *.pth
 *.pt
 *.onnx
+*.h5
+*.pkl
+*.pickle
+
+# Logs & Temp Files
+logs/
+*.log
+*.log.*
+*.out
+*.err
+tmp/
+temp/
+
+# Data Files (if needed)
+data/
+*.csv
+*.json
+*.xml
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+.dockerignore
+
+# IDE temporary/cache files
+.venv/
+.env.local
+.cache/
+.pytest_cache/
+node_modules/
+
+# OS specific
+.LSOverride
+.AppleDouble
+.AppleDB

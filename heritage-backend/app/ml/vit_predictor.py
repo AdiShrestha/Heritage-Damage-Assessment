@@ -27,10 +27,23 @@ class ViTPredictor(BasePredictor):
 
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
             if weights_path is None or not weights_path.exists():
-                logger.warning("ViT weights not found at %s. Predictor inactive.", weights_path)
+                logger.warning(
+                    "ViT weights not found at %s. Predictor inactive.", weights_path
+                )
                 return
-            model = timm.create_model("vit_base_patch16_384", pretrained=False, num_classes=NUM_CLASSES)
-            model.load_state_dict(torch.load(weights_path, map_location=self._device))
+            model = timm.create_model(
+                "vit_base_patch16_224", pretrained=False, num_classes=0
+            )
+            model.head = torch.nn.Sequential(
+                torch.nn.LayerNorm(model.embed_dim),
+                torch.nn.Linear(model.embed_dim, 256),
+                torch.nn.GELU(),
+                torch.nn.Dropout(0.4),
+                torch.nn.Linear(256, NUM_CLASSES),
+            )
+            ckpt = torch.load(weights_path, map_location=self._device)
+            model.load_state_dict(ckpt.get("model_state", ckpt))
+
             model.eval()
             self._model = model.to(self._device)
             self._loaded = True

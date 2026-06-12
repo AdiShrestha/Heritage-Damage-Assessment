@@ -27,12 +27,17 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "*"
     TORCH_DEVICE: str = "cuda"
     MAX_IMAGE_SIZE_MB: float = 10.0
-    DEFAULT_MODEL: str = "mock"
-    ENABLED_MODELS: str = "mock,resnet50,efficientnet_b4,vit_b16"
+    DEFAULT_MODEL: str = "moe"
+    ENABLED_MODELS: str = "mock,resnet50,efficientnet_b4,vit_b16,yolo_damage,moe"
     MODEL_WEIGHTS_DIR: Path = Path("weights/")
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: Literal["json", "text"] = "json"
     REQUEST_TIMEOUT_SECONDS: float = 30.0
+    HISTORY_DB_PATH: Path = Path("data/history.db")
+    CACHE_TTL_SECONDS: float = 3600.0
+    CACHE_MAX_ENTRIES: int = 512
+    MC_DROPOUT_PASSES: int = 15
+    WARMUP_ON_STARTUP: bool = True
 
     @property
     def allowed_origins_list(self) -> list[str]:

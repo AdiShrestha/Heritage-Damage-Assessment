@@ -13,12 +13,12 @@ RUN pip install --no-cache-dir uv
 COPY pyproject.toml .
 
 RUN if [ "$INSTALL_ML" = "true" ]; then \
-        uv pip install --system --no-cache-dir ".[inference,explainability,detection]"; \
+        uv pip install --system ".[inference,explainability,detection]"; \
     else \
-        uv pip install --system --no-cache-dir .; \
-    fi
-
-
+        uv pip install --system .; \
+    fi \
+    && pip uninstall -y opencv-python opencv-contrib-python 2>/dev/null || true \
+    && pip install --no-cache-dir opencv-python-headless
 # Stage 2: runtime
 FROM python:3.12-slim
 
