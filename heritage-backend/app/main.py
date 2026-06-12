@@ -76,7 +76,7 @@
 from __future__ import annotations
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import AsyncGenerator
 import torch
 from fastapi import FastAPI
