@@ -39,30 +39,42 @@ export function Navbar() {
   }, [location.pathname]);
 
   const navClass = ({ isActive }) =>
-    `text-sm tracking-wide transition-colors duration-150 ease-in-out ${
+    `text-xs lg:text-sm tracking-wide transition-colors duration-150 ease-in-out ${
       isActive ? 'font-semibold text-[#F7EDE8]' : 'text-[#E2DCD6] hover:text-[#F7EDE8]'
     }`;
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 bg-[#1C1816] text-white shadow-lg">
+    <header className="fixed inset-x-0 top-0 z-50 bg-[#1C1816] text-white shadow-lg print:hidden">
       <div className="mx-auto flex max-w-[1100px] items-center justify-between px-4 py-3 sm:px-6">
-        <NavLink to="/" className="flex items-center gap-3 group">
+        <NavLink to="/" className="flex items-center gap-2 group mr-4">
           <div className="text-[#D4A04A] transition-colors duration-200 group-hover:text-[#E8C47A]">
             <PagodaIcon />
           </div>
-          <div>
-            <div className="font-display text-lg font-semibold tracking-tight text-[#F5F0EB]">
+          <div className="hidden sm:block">
+            <div className="font-display text-sm md:text-base font-semibold tracking-tight text-[#F5F0EB]">
               Heritage Assessment
             </div>
-            <div className="text-xs text-[#A69A92] font-display italic">
-              AI-Powered Damage Detection
+            <div className="text-3xs text-[#A69A92] font-display italic">
+              AI Mixture of Experts
             </div>
           </div>
         </NavLink>
 
-        <nav className="hidden items-center gap-8 md:flex">
+        <nav className="hidden items-center gap-4 lg:gap-6 md:flex">
           <NavLink to="/" end className={navClass}>
             Assess
+          </NavLink>
+          <NavLink to="/batch" className={navClass}>
+            Batch
+          </NavLink>
+          <NavLink to="/compare" className={navClass}>
+            Compare
+          </NavLink>
+          <NavLink to="/uncertainty" className={navClass}>
+            Uncertainty
+          </NavLink>
+          <NavLink to="/dashboard" className={navClass}>
+            Dashboard
           </NavLink>
           <NavLink to="/models" className={navClass}>
             Models
@@ -72,10 +84,10 @@ export function Navbar() {
           </NavLink>
         </nav>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-sm text-[#E2DCD6]">
-            <span className={`h-2 w-2 rounded-full ${getDotClass(status)} ${status === 'ok' ? 'animate-pulse' : ''}`} />
-            <span className="hidden sm:inline">{getStatusCopy(status)}</span>
+        <div className="flex items-center gap-3 ml-auto">
+          <div className="flex items-center gap-1.5 text-xs text-[#E2DCD6]">
+            <span className={`h-1.5 w-1.5 rounded-full ${getDotClass(status)} ${status === 'ok' ? 'animate-pulse' : ''}`} />
+            <span className="hidden md:inline">{getStatusCopy(status)}</span>
           </div>
 
           <button
@@ -84,7 +96,7 @@ export function Navbar() {
             className="inline-flex items-center justify-center rounded-lg border border-white/15 p-2 text-[#E2DCD6] transition-colors duration-150 ease-in-out hover:bg-white/10 md:hidden"
             aria-label="Open navigation menu"
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -93,9 +105,21 @@ export function Navbar() {
 
       {mobileOpen ? (
         <div className="border-t border-white/10 bg-[#1C1816] px-4 py-3 md:hidden">
-          <div className="mx-auto flex max-w-[1100px] flex-col gap-3">
+          <div className="mx-auto flex max-w-[1100px] flex-col gap-2.5">
             <NavLink to="/" end className={navClass}>
               Assess
+            </NavLink>
+            <NavLink to="/batch" className={navClass}>
+              Batch
+            </NavLink>
+            <NavLink to="/compare" className={navClass}>
+              Compare
+            </NavLink>
+            <NavLink to="/uncertainty" className={navClass}>
+              Uncertainty
+            </NavLink>
+            <NavLink to="/dashboard" className={navClass}>
+              Dashboard
             </NavLink>
             <NavLink to="/models" className={navClass}>
               Models

@@ -159,6 +159,7 @@ def generate_report(
         # ── Visualisation note ────────────────────────────────────────────────
         "visualization": {
             "gradcam_available": response.gradcam_image_base64 is not None,
+            "gradcam_image_base64": response.gradcam_image_base64,
             "note": (
                 "Damage heatmap with bounding boxes is available in "
                 "gradcam_image_base64 of the parent prediction response."

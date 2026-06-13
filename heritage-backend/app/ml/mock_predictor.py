@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import random
 import time
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -23,7 +24,7 @@ class MockPredictor(BasePredictor):
     def __init__(self) -> None:
         self._loaded = False
 
-    def load_model(self, weights_path: Path | None = None) -> None:  # type: ignore[name-defined]
+    def load_model(self, weights_path: Path | None = None) -> None:
         """Mock load - no weights required."""
         self._loaded = True
         logger.info("MockPredictor loaded (no weights needed)")

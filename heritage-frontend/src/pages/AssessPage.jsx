@@ -1,17 +1,40 @@
 import { useState } from 'react';
-import { Building2, X } from 'lucide-react';
+import { Building2, X, FileText, Settings } from 'lucide-react';
 import { usePrediction } from '../hooks/usePrediction';
 import { useModels } from '../hooks/useModels';
 import { ImageDropzone } from '../components/upload/ImageDropzone';
 import { ModelSelector } from '../components/assessment/ModelSelector';
 import { ResultCard } from '../components/assessment/ResultCard';
+import { ReportViewer } from '../components/assessment/ReportViewer';
 import { ErrorAlert } from '../components/common/ErrorAlert';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 import { formatFileSize } from '../utils/image';
 
 export default function AssessPage() {
   const { models } = useModels();
-  const { status, result, error, selectedFile, previewURL, selectedModel, setFile, setModel, run, reset } = usePrediction();
+  const {
+    status,
+    result,
+    error,
+    selectedFile,
+    previewURL,
+    selectedModel,
+    isReportMode,
+    siteId,
+    siteName,
+    surveyor,
+    notes,
+    setFile,
+    setModel,
+    setIsReportMode,
+    setSiteId,
+    setSiteName,
+    setSurveyor,
+    setNotes,
+    run,
+    reset,
+  } = usePrediction();
+  
   const [previewLabel, setPreviewLabel] = useState(null);
 
   function handleFile(file) {
@@ -28,7 +51,7 @@ export default function AssessPage() {
 
   return (
     <div>
-      <div className="mb-8">
+      <div className="mb-8 print:hidden">
         <div className="flex items-center gap-3 mb-1">
           <svg width="24" height="24" viewBox="0 0 64 64" fill="none" aria-hidden="true" className="text-[#A63A2A]">
             <rect x="8" y="24" width="48" height="36" rx="2" fill="currentColor" opacity="0.85" />
@@ -46,8 +69,10 @@ export default function AssessPage() {
         </p>
       </div>
 
-      <div className="grid gap-8 md:grid-cols-[420px_1fr]">
-        <div className="space-y-6">
+      <div className="grid gap-8 md:grid-cols-[400px_1fr] print:grid-cols-1">
+        {/* Left Side Controls (hidden during print if showing report) */}
+        <div className="space-y-6 print:hidden">
+          {/* Upload Card */}
           <section className="heritage-card p-5">
             <h2 className="text-sm font-semibold tracking-tight text-text">
               <span className="heritage-ornament">Upload Image</span>
@@ -81,6 +106,7 @@ export default function AssessPage() {
             ) : null}
           </section>
 
+          {/* Model Selector Card */}
           <section className="heritage-card p-5">
             <h2 className="text-sm font-semibold tracking-tight text-text">
               <span className="heritage-ornament">Select Model</span>
@@ -90,6 +116,82 @@ export default function AssessPage() {
             </div>
           </section>
 
+          {/* Report Options Card */}
+          <section className="heritage-card p-5 space-y-4">
+            <h2 className="text-sm font-semibold tracking-tight text-text">
+              <span className="heritage-ornament">Assessment Options</span>
+            </h2>
+            
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                id="isReportMode"
+                type="checkbox"
+                checked={isReportMode}
+                onChange={(e) => setIsReportMode(e.target.checked)}
+                className="h-4 w-4 rounded border-stone-custom-light text-[#A63A2A] focus:ring-[#A63A2A]/20"
+                disabled={status === 'loading'}
+              />
+              <label htmlFor="isReportMode" className="text-xs font-semibold text-text flex items-center gap-1.5 cursor-pointer">
+                <FileText className="h-3.5 w-3.5 text-[#A63A2A]" />
+                Generate Structured Report
+              </label>
+            </div>
+
+            {isReportMode && (
+              <div className="mt-3 space-y-3 border-t border-stone-custom-light pt-3 text-xs fade-in">
+                <div>
+                  <label htmlFor="siteId" className="block font-medium text-text-muted mb-1">Site ID</label>
+                  <input
+                    id="siteId"
+                    type="text"
+                    value={siteId}
+                    onChange={(e) => setSiteId(e.target.value)}
+                    placeholder="e.g. patan_durbar_01"
+                    className="w-full rounded-lg border border-stone-custom-light bg-bg px-3 py-2 text-xs text-text placeholder-text-muted focus:border-primary focus:outline-none"
+                    disabled={status === 'loading'}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="siteName" className="block font-medium text-text-muted mb-1">Site Name</label>
+                  <input
+                    id="siteName"
+                    type="text"
+                    value={siteName}
+                    onChange={(e) => setSiteName(e.target.value)}
+                    placeholder="e.g. Patan Durbar Square"
+                    className="w-full rounded-lg border border-stone-custom-light bg-bg px-3 py-2 text-xs text-text placeholder-text-muted focus:border-primary focus:outline-none"
+                    disabled={status === 'loading'}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="surveyor" className="block font-medium text-text-muted mb-1">Surveyor Name</label>
+                  <input
+                    id="surveyor"
+                    type="text"
+                    value={surveyor}
+                    onChange={(e) => setSurveyor(e.target.value)}
+                    placeholder="e.g. Ar. Rajesh Shrestha"
+                    className="w-full rounded-lg border border-stone-custom-light bg-bg px-3 py-2 text-xs text-text placeholder-text-muted focus:border-primary focus:outline-none"
+                    disabled={status === 'loading'}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="notes" className="block font-medium text-text-muted mb-1">Field Notes</label>
+                  <textarea
+                    id="notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Describe cracks, weathering, or stability concerns..."
+                    rows="3"
+                    className="w-full rounded-lg border border-stone-custom-light bg-bg px-3 py-2 text-xs text-text placeholder-text-muted focus:border-primary focus:outline-none"
+                    disabled={status === 'loading'}
+                  />
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Trigger Card */}
           <section className="heritage-card p-5">
             <button
               type="button"
@@ -100,10 +202,10 @@ export default function AssessPage() {
               {status === 'loading' ? (
                 <span className="flex items-center gap-2">
                   <LoadingSpinner size="sm" />
-                  Analysing...
+                  {isReportMode ? 'Generating Report...' : 'Analysing...'}
                 </span>
               ) : (
-                'Run Assessment'
+                isReportMode ? 'Generate Survey Report' : 'Run Assessment'
               )}
             </button>
 
@@ -117,15 +219,16 @@ export default function AssessPage() {
           ) : null}
         </div>
 
-        <div>
+        {/* Right Side Visual Results */}
+        <div className="print:w-full">
           {status === 'loading' ? (
-            <div className="flex min-h-[400px] items-center justify-center rounded-xl border border-dashed border-stone-custom-light bg-white/80 p-8 shadow-card backdrop-blur-sm">
+            <div className="flex min-h-[400px] items-center justify-center rounded-xl border border-dashed border-stone-custom-light bg-white/80 p-8 shadow-card backdrop-blur-sm print:hidden">
               <div className="text-center">
-                <LoadingSpinner size="lg" label="Running inference..." />
+                <LoadingSpinner size="lg" label={isReportMode ? 'Compiling structured report...' : 'Running inference...'} />
               </div>
             </div>
           ) : showEmptyState ? (
-            <div className="flex min-h-[400px] items-center justify-center rounded-xl border border-dashed border-brick-light bg-white/80 p-8 text-center shadow-card">
+            <div className="flex min-h-[400px] items-center justify-center rounded-xl border border-dashed border-brick-light bg-white/80 p-8 text-center shadow-card print:hidden">
               <div>
                 <div className="mx-auto mb-4 flex items-center justify-center">
                   <svg width="48" height="48" viewBox="0 0 64 64" fill="none" aria-hidden="true" className="text-stone-custom/40">
@@ -143,7 +246,11 @@ export default function AssessPage() {
               </div>
             </div>
           ) : result ? (
-            <ResultCard result={result} originalSrc={previewURL} />
+            isReportMode ? (
+              <ReportViewer report={result} />
+            ) : (
+              <ResultCard result={result} originalSrc={previewURL} />
+            )
           ) : null}
         </div>
       </div>

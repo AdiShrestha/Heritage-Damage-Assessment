@@ -1,39 +1,63 @@
 from __future__ import annotations
 
-"""YOLO predictor aligned to temple classification output."""
+"""YOLO fallback predictor (Custom CNN) — aligned to temple classification output, includes Grad-CAM."""
 
 from pathlib import Path
 from typing import Any
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+from PIL import Image
+
 from app.ml.base_predictor import BasePredictor, PredictionResult
 from app.core.logging import get_logger
 from app.core.exceptions import InferenceError
+from app.utils.constants import CLASS_NAMES, NUM_CLASSES
 
 logger = get_logger(__name__)
 
-try:
-    from ultralytics import YOLO
 
-    YOLO_AVAILABLE = True
-except ImportError:
-    YOLO_AVAILABLE = False
+class _YOLOFallback(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.backbone = nn.Sequential(
+            nn.Conv2d(3, 64, 7, stride=2, padding=3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(3, stride=2, padding=1),
+            nn.Conv2d(64, 128, 3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.Conv2d(128, 256, 3, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d(1),
+        )
+        self.head = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(256, 256),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(256, NUM_CLASSES),
+        )
+
+    def forward(self, x):
+        return self.head(self.backbone(x))
 
 
 class YOLOPredictor(BasePredictor):
-    """YOLO predictor for temple classification."""
+    """Fallback CNN predictor originally named YOLO."""
 
     def __init__(self) -> None:
         self._model = None
         self._loaded = False
         self._device = "cpu"
-        self._class_names: dict[int, str] = {}
+        self._weights_name: str = "not-loaded"
 
     def load_model(self, weights_path: Path | None = None) -> None:
-        """Load trained YOLO model weights."""
-        if not YOLO_AVAILABLE:
-            logger.error("ultralytics not installed. YOLOPredictor unavailable.")
-            return
-
+        """Load trained model weights."""
         try:
             if weights_path is None or not weights_path.exists():
                 logger.warning(
@@ -42,30 +66,22 @@ class YOLOPredictor(BasePredictor):
                 self._loaded = False
                 return
 
-            self._model = YOLO(str(weights_path))
-            names = getattr(self._model, "names", None)
-            if isinstance(names, dict):
-                self._class_names = {int(k): str(v) for k, v in names.items()}
-            elif isinstance(names, list):
-                self._class_names = {idx: str(name) for idx, name in enumerate(names)}
-            else:
-                self._class_names = {}
+            self._device = "cuda" if torch.cuda.is_available() else "cpu"
+            self._model = _YOLOFallback().to(self._device)
+            
+            ckpt = torch.load(weights_path, map_location=self._device)
+            state = ckpt.get("model_state", ckpt)
+            self._model.load_state_dict(state, strict=False)
+            self._model.eval()
 
+            self._weights_name = weights_path.name
             self._loaded = True
-            logger.info(
-                "YOLO classifier loaded from %s with classes: %s",
-                weights_path,
-                list(self._class_names.values()) if self._class_names else "unknown",
-            )
-        except ImportError:
-            logger.error("ultralytics not installed. YOLOPredictor unavailable.")
-            self._loaded = False
+            logger.info("YOLO (fallback CNN) classifier loaded from %s", weights_path)
         except Exception as e:
-            logger.error("Failed to load YOLO: %s", str(e))
+            logger.error("Failed to load YOLO fallback: %s", str(e), exc_info=True)
             self._loaded = False
 
     def predict(self, image: Any) -> PredictionResult:
-        """Run YOLO and return temple classification output."""
         if not self._loaded or self._model is None:
             raise InferenceError("YOLO weights not loaded.")
 
@@ -73,61 +89,107 @@ class YOLOPredictor(BasePredictor):
             raise InferenceError("Invalid image supplied for inference.")
 
         try:
-            pil_image = image.convert("RGB") if image.mode != "RGB" else image.copy()
-            results = self._model.predict(pil_image, verbose=False, conf=0.5)
-            result = results[0]
+            pil_image = image.convert("RGB")
+            
+            # Preprocess
+            arr = np.array(pil_image.resize((224, 224))).astype(np.float32) / 255.0
+            mean = np.array([0.485, 0.456, 0.406])
+            std = np.array([0.229, 0.224, 0.225])
+            arr = (arr - mean) / std
+            tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0).float().to(self._device)
 
-            class_probs: dict[str, float] = {}
-            predicted_class = "unknown"
-            confidence = 0.0
+            with torch.no_grad():
+                logits = self._model(tensor)
+                probs = F.softmax(logits, dim=1)[0]
+            
+            pred_idx = int(probs.argmax())
+            confidence = float(probs[pred_idx])
+            predicted_class = CLASS_NAMES[pred_idx]
+            
+            class_probs = {
+                CLASS_NAMES[i]: round(float(probs[i]), 4)
+                for i in range(NUM_CLASSES)
+            }
 
-            # Preferred path: YOLO classification head output.
-            if getattr(result, "probs", None) is not None:
-                probs_tensor = result.probs.data
-                probs = probs_tensor.cpu().tolist()
-                class_probs = {
-                    self._class_names.get(idx, str(idx)): round(float(prob), 4)
-                    for idx, prob in enumerate(probs)
-                }
-                top_idx = int(result.probs.top1)
-                predicted_class = self._class_names.get(top_idx, str(top_idx))
-                confidence = float(result.probs.top1conf.cpu().item())
-
-            # Fallback path: if model returns detection boxes, aggregate scores by class.
-            elif (
-                getattr(result, "boxes", None) is not None
-                and result.boxes is not None
-                and len(result.boxes) > 0
-            ):
-                scores: dict[int, float] = {}
-                total = 0.0
-                for conf, cls_id in zip(
-                    result.boxes.conf.cpu().numpy(), result.boxes.cls.cpu().numpy()
-                ):
-                    idx = int(cls_id)
-                    score = float(conf)
-                    scores[idx] = scores.get(idx, 0.0) + score
-                    total += score
-
-                if total > 0:
-                    class_probs = {
-                        self._class_names.get(idx, str(idx)): round(score / total, 4)
-                        for idx, score in scores.items()
-                    }
-                    top_idx = max(scores, key=scores.get)
-                    predicted_class = self._class_names.get(top_idx, str(top_idx))
-                    confidence = float(class_probs[predicted_class])
+            # ── Grad-CAM ─────────────────────────────────────────────────────
+            gradcam_image = None
+            try:
+                gradcam_image = self._gradcam(tensor, pred_idx, pil_image)
+            except Exception as e:
+                logger.debug("YOLO Grad-CAM skipped: %s", e)
 
             return PredictionResult(
                 predicted_class=predicted_class,
                 confidence=confidence,
                 class_probabilities=class_probs,
-                gradcam_image=None,
+                gradcam_image=gradcam_image,
                 detections=None,
             )
+        except InferenceError:
+            raise
         except Exception as e:
             logger.error("YOLO inference failed: %s", str(e))
             raise InferenceError(f"Classification failed: {str(e)}")
+
+    def _gradcam(self, tensor: torch.Tensor, pred_idx: int, original_pil: Image.Image) -> Image.Image:
+        """Grad-CAM for the fallback CNN."""
+        SIZE = 224
+        
+        # Target the last Conv2d in the backbone
+        conv_layers = [m for m in self._model.backbone.modules() if isinstance(m, nn.Conv2d)]
+        if not conv_layers:
+            raise RuntimeError("No Conv2d layers found in backbone")
+        target = conv_layers[-1]
+
+        activations: list = []
+        gradients: list = []
+
+        def fwd(_, __, out):
+            activations.append(out.detach().clone())
+
+        def bwd(_, __, grad_out):
+            gradients.append(grad_out[0].detach().clone())
+
+        h_fwd = target.register_forward_hook(fwd)
+        h_bwd = target.register_full_backward_hook(bwd)
+
+        try:
+            inp = tensor.detach().clone().requires_grad_(True)
+            self._model.eval()
+            with torch.enable_grad():
+                logits = self._model(inp)
+                score = logits[0, pred_idx]
+                self._model.zero_grad()
+                score.backward()
+        finally:
+            h_fwd.remove()
+            h_bwd.remove()
+
+        if not activations or not gradients:
+            raise RuntimeError("Hooks did not fire")
+
+        act = activations[0].squeeze(0)   # [C, H, W]
+        grad = gradients[0].squeeze(0)    # [C, H, W]
+
+        weights = grad.mean(dim=[1, 2], keepdim=True)
+        cam = F.relu((weights * act).sum(dim=0))
+        cam = F.interpolate(
+            cam.unsqueeze(0).unsqueeze(0).float(),
+            size=(SIZE, SIZE),
+            mode="bilinear",
+            align_corners=False,
+        ).squeeze().cpu().numpy()
+        
+        cam = (cam - cam.min()) / (cam.max() - cam.min() + 1e-7)
+
+        # ── JET colormap overlay ──────────────────────────────────────────────
+        orig = np.array(original_pil.resize((SIZE, SIZE))).astype(np.float32) / 255.0
+        r = np.clip(1.5 - np.abs(4.0 * cam - 3.0), 0, 1)
+        g = np.clip(1.5 - np.abs(4.0 * cam - 2.0), 0, 1)
+        b = np.clip(1.5 - np.abs(4.0 * cam - 1.0), 0, 1)
+        jet = np.stack([r, g, b], axis=-1)
+        blend = np.clip(0.55 * orig + 0.45 * jet, 0, 1)
+        return Image.fromarray((blend * 255).astype(np.uint8))
 
     def is_loaded(self) -> bool:
         return self._loaded
@@ -138,4 +200,4 @@ class YOLOPredictor(BasePredictor):
 
     @property
     def model_version(self) -> str:
-        return "best.pt"
+        return self._weights_name if self._loaded else "not-loaded"

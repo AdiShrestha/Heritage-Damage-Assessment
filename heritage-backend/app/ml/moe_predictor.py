@@ -180,7 +180,7 @@ class MoEPredictor(BasePredictor):
                     logger.warning("Expert %s missing at %s — random init", name, wpath)
                 m.eval()
                 for p in m.parameters():
-                    p.requires_grad = False
+                    p.requires_grad = True
                 expert_models[name] = m
 
             # ── Feature extractor wrappers ────────────────────────────────────
@@ -345,7 +345,6 @@ class MoEPredictor(BasePredictor):
 
             # ── Per-expert breakdown ──────────────────────────────────────────
             per_expert = []
-            top_expert_idx, top_expert_conf = 0, 0.0
             for i, (name, logits) in enumerate(zip(self._expert_names, expert_logits)):
                 ep = F.softmax(logits, dim=1)[0]
                 conf = float(ep.max())
@@ -357,9 +356,9 @@ class MoEPredictor(BasePredictor):
                         "gate_weight": gate_weights[i],
                     }
                 )
-                if conf > top_expert_conf:
-                    top_expert_conf = conf
-                    top_expert_idx = i
+
+            # Determine top expert based on the highest gate weight
+            top_expert_idx = int(np.argmax(gate_weights))
 
             # ── Grad-CAM ─────────────────────────────────────────────────────
             heatmap_np = self._compute_gradcam(
@@ -369,22 +368,26 @@ class MoEPredictor(BasePredictor):
                 self._expert_names[top_expert_idx],
             )
 
-            # ── Composite visualization ───────────────────────────────────────
+            # ── Heatmap overlay visualization ─────────────────────────────────
+            from PIL import Image
             source_pil = pil if pil is not None else _tensor_to_pil(tensor)
-            composite = _build_composite(
-                original_pil=source_pil,
-                heatmap_np=heatmap_np,
-                predicted_class=predicted_class,
-                confidence=confidence,
-                criticality=criticality,
-                per_expert=per_expert,
-            )
+            orig_np = np.array(source_pil.convert("RGB").resize((_IMG_SIZE, _IMG_SIZE)))
+            heat_np = _heatmap_overlay(orig_np, heatmap_np)
+            
+            # Optionally draw damage boxes if criticality is not STABLE
+            if criticality != "STABLE":
+                boxes = _damage_boxes(heatmap_np, threshold=0.50)
+                if boxes:
+                    crit_rgb = _CRIT_COLOUR.get(criticality, _CRIT_COLOUR["UNKNOWN"])
+                    heat_np = _draw_boxes_pil(heat_np.copy(), boxes, colour=crit_rgb)
+            
+            heatmap_pil = Image.fromarray(heat_np)
 
             result = PredictionResult(
                 predicted_class=predicted_class,
                 confidence=confidence,
                 class_probabilities=class_probabilities,
-                gradcam_image=composite,
+                gradcam_image=heatmap_pil,
             )
             # MoE-specific extras surfaced by PredictionService
             result.gate_weights = gate_weights

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""ResNet50 predictor with EMA inference and Grad-CAM support."""
+"""ResNet50 predictor — EMA optional (graceful if torch_ema not installed)."""
 
 from pathlib import Path
 from typing import Any
@@ -10,38 +10,33 @@ from app.core.logging import get_logger
 from app.ml.base_predictor import BasePredictor, PredictionResult
 from app.utils.constants import CLASS_NAMES, NUM_CLASSES
 
+logger = get_logger(__name__)
+
 
 class ResNetPredictor(BasePredictor):
-    """ResNet50 predictor backed by trained weights."""
-
     def __init__(self) -> None:
         self._model = None
-        self._ema = None
+        self._ema = None  # None if torch_ema absent
         self._loaded = False
         self._device = "cpu"
         self._epoch: int | None = None
         self._best_f1: float | None = None
-        self._logger = get_logger(__name__)
 
     def load_model(self, weights_path: Path | None = None) -> None:
-        """Load trained ResNet50 weights and EMA state."""
         try:
             import torch
             import torch.nn as nn
             import torchvision.models as models
-            from torch_ema import ExponentialMovingAverage
 
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
 
             if weights_path is None or not weights_path.exists():
-                self._logger.warning("ResNet50 weights not found at %s. Predictor inactive.", weights_path)
-                self._loaded = False
-                self._model = None
-                self._ema = None
-                self._epoch = None
-                self._best_f1 = None
+                logger.warning(
+                    "ResNet50 weights not found at %s — inactive.", weights_path
+                )
                 return
 
+            # ── Build model ───────────────────────────────────────────────────
             model = models.resnet50(weights=None)
             model.fc = nn.Sequential(
                 nn.BatchNorm1d(2048),
@@ -53,110 +48,171 @@ class ResNetPredictor(BasePredictor):
                 nn.Linear(512, NUM_CLASSES),
             )
 
+            # ── Load checkpoint ───────────────────────────────────────────────
+            # Checkpoint is {"model_state": …, "ema_state": …, "epoch": …, …}
             ckpt = torch.load(weights_path, map_location=self._device)
-            model.load_state_dict(ckpt["model_state"])
-
-            ema = ExponentialMovingAverage(model.parameters(), decay=0.9998)
-            ema.load_state_dict(ckpt["ema_state"])
-
+            state = ckpt.get("model_state", ckpt)  # fall back if plain state dict
+            model.load_state_dict(state, strict=True)
             self._epoch = int(ckpt.get("epoch", -1)) + 1
             self._best_f1 = ckpt.get("best_f1")
 
             model.eval()
-            model = model.to(self._device)
+            self._model = model.to(self._device)
 
-            self._model = model
-            self._ema = ema
+            # ── EMA (optional) ────────────────────────────────────────────────
+            try:
+                from torch_ema import ExponentialMovingAverage
+
+                ema = ExponentialMovingAverage(model.parameters(), decay=0.9998)
+                if "ema_state" in ckpt:
+                    ema.load_state_dict(ckpt["ema_state"])
+                self._ema = ema
+                logger.info(
+                    "ResNet50 loaded WITH EMA from %s (epoch %s, F1=%.4f)",
+                    weights_path,
+                    self._epoch,
+                    self._best_f1 or 0,
+                )
+            except ImportError:
+                self._ema = None
+                logger.warning(
+                    "torch_ema not installed — ResNet50 loaded WITHOUT EMA. "
+                    "Install with: pip install torch-ema"
+                )
+                logger.info(
+                    "ResNet50 loaded (no EMA) from %s (epoch %s, F1=%.4f)",
+                    weights_path,
+                    self._epoch,
+                    self._best_f1 or 0,
+                )
+
             self._loaded = True
-            self._logger.info(
-                "ResNet50 loaded from %s on %s (epoch %s, best_f1=%s)",
-                weights_path,
-                self._device,
-                self._epoch,
-                self._best_f1,
-            )
-        except ImportError:
-            self._logger.error("PyTorch not installed.")
-            self._loaded = False
-            self._model = None
-            self._ema = None
-            self._epoch = None
-            self._best_f1 = None
+
         except Exception as exc:
-            self._logger.error("Failed to load ResNet50: %s", str(exc))
+            # Log the real error — don't swallow it silently
+            logger.error("ResNet50 load FAILED: %s", exc, exc_info=True)
             self._loaded = False
             self._model = None
             self._ema = None
-            self._epoch = None
-            self._best_f1 = None
 
     def predict(self, image: Any) -> PredictionResult:
-        """Run inference using the EMA-averaged ResNet50 weights."""
-        if not self._loaded or self._model is None or self._ema is None:
+        if not self._loaded or self._model is None:
             raise InferenceError("ResNet50 weights not loaded.")
 
         import numpy as np
         import torch
         from PIL import Image
 
-        if not hasattr(image, "convert"):
-            raise InferenceError("Invalid image supplied for inference.")
-
-        pil_image: Image.Image = image.convert("RGB") if image.mode != "RGB" else image.copy()
-        resized = pil_image.resize((224, 224), Image.Resampling.LANCZOS)
-        image_array = np.array(resized).astype(np.float32) / 255.0
-        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-        normalized = (image_array - mean) / std
-        input_tensor = torch.from_numpy(normalized.transpose(2, 0, 1)).unsqueeze(0).float().to(self._device)
+        # Accept both PIL image and pre-processed tensor
+        if hasattr(image, "convert"):
+            pil = image.convert("RGB").resize((224, 224), Image.Resampling.LANCZOS)
+            arr = np.array(pil).astype(np.float32) / 255.0
+            mean = np.array([0.485, 0.456, 0.406])
+            std = np.array([0.229, 0.224, 0.225])
+            tensor = (
+                torch.from_numpy(((arr - mean) / std).transpose(2, 0, 1))
+                .unsqueeze(0)
+                .float()
+                .to(self._device)
+            )
+        else:
+            tensor = image.to(self._device)
 
         self._model.eval()
-        with self._ema.average_parameters():
+
+        def _infer():
             with torch.no_grad():
-                logits = self._model(input_tensor)
+                return self._model(tensor)
+
+        if self._ema is not None:
+            with self._ema.average_parameters():
+                logits = _infer()
+        else:
+            logits = _infer()
 
         probs = torch.softmax(logits[0], dim=0).cpu().numpy()
-        pred_idx = int(np.argmax(probs))
+        pred_idx = int(probs.argmax())
 
         gradcam_image = None
         try:
-            gradcam_image = self._generate_gradcam(input_tensor, pil_image)
-        except Exception as exc:
-            self._logger.warning("Grad-CAM generation failed: %s", str(exc))
-
-        class_probabilities = {
-            class_name: round(float(probs[idx]), 4)
-            for idx, class_name in enumerate(CLASS_NAMES)
-        }
+            gradcam_image = self._gradcam(
+                tensor, image if hasattr(image, "convert") else None
+            )
+        except Exception as e:
+            logger.debug("ResNet Grad-CAM skipped: %s", e)
 
         return PredictionResult(
             predicted_class=CLASS_NAMES[pred_idx],
             confidence=float(probs[pred_idx]),
-            class_probabilities=class_probabilities,
+            class_probabilities={CLASS_NAMES[i]: float(p) for i, p in enumerate(probs)},
             gradcam_image=gradcam_image,
         )
 
-    def _generate_gradcam(self, input_tensor: Any, original_pil_image: Any):
-        """Generate a Grad-CAM overlay for the current prediction."""
+    def _gradcam(self, tensor, original_pil):
+        import torch
+        import torch.nn.functional as F
+        import numpy as np
+        from PIL import Image
+
+        target = self._model.layer4[-1]
+        activations = []
+        gradients = []
+
+        h_fwd = target.register_forward_hook(
+            lambda _, __, out: activations.append(out.detach().clone())
+        )
+        h_bwd = target.register_full_backward_hook(
+            lambda _, __, grad_out: gradients.append(grad_out[0].detach().clone())
+        )
+
         try:
-            import numpy as np
-            from PIL import Image
-            from pytorch_grad_cam import GradCAM
-            from pytorch_grad_cam.utils.image import show_cam_on_image
+            inp = tensor.detach().clone().requires_grad_(True)
+            if self._ema is not None:
+                with self._ema.average_parameters():
+                    with torch.enable_grad():
+                        out = self._model(inp)
+                        score = out[0, out[0].argmax()]
+                        self._model.zero_grad()
+                        score.backward()
+            else:
+                with torch.enable_grad():
+                    out = self._model(inp)
+                    score = out[0, out[0].argmax()]
+                    self._model.zero_grad()
+                    score.backward()
+        finally:
+            h_fwd.remove()
+            h_bwd.remove()
 
-            self._model.eval()
-            with self._ema.average_parameters():
-                cam = GradCAM(model=self._model, target_layers=[self._model.layer4[-1]])
-                grayscale_cam = cam(input_tensor=input_tensor)[0]
-
-            rgb_image = original_pil_image.convert("RGB").resize((224, 224), Image.Resampling.LANCZOS)
-            rgb_float = np.asarray(rgb_image).astype(np.float32) / 255.0
-            rgb_float = np.clip(rgb_float, 0.0, 1.0)
-            overlay = show_cam_on_image(rgb_float, grayscale_cam, use_rgb=True)
-            return Image.fromarray(overlay)
-        except Exception as exc:
-            self._logger.warning("Grad-CAM generation failed: %s", str(exc))
+        if not activations or not gradients:
             return None
+
+        act = activations[0].squeeze(0)
+        grad = gradients[0].squeeze(0)
+        weights = grad.mean(dim=[1, 2], keepdim=True)
+        cam = F.relu((weights * act).sum(dim=0))
+        cam = (
+            F.interpolate(
+                cam.unsqueeze(0).unsqueeze(0).float(),
+                size=(224, 224),
+                mode="bilinear",
+                align_corners=False,
+            )
+            .squeeze()
+            .cpu()
+            .numpy()
+        )
+        cam = (cam - cam.min()) / (cam.max() - cam.min() + 1e-7)
+
+        if original_pil is None:
+            return None
+        orig = (
+            np.array(original_pil.convert("RGB").resize((224, 224))).astype(np.float32)
+            / 255.0
+        )
+        jet = _apply_jet(cam).astype(np.float32) / 255.0
+        blend = np.clip(0.55 * orig + 0.45 * jet, 0, 1)
+        return Image.fromarray((blend * 255).astype(np.uint8))
 
     def is_loaded(self) -> bool:
         return self._loaded
@@ -167,6 +223,13 @@ class ResNetPredictor(BasePredictor):
 
     @property
     def model_version(self) -> str:
-        if self._loaded and self._epoch is not None:
-            return f"epoch-{self._epoch}"
-        return "not-loaded"
+        return f"epoch-{self._epoch}" if self._loaded and self._epoch else "not-loaded"
+
+
+def _apply_jet(t):
+    import numpy as np
+
+    r = np.clip(1.5 - np.abs(4.0 * t - 3.0), 0.0, 1.0)
+    g = np.clip(1.5 - np.abs(4.0 * t - 2.0), 0.0, 1.0)
+    b = np.clip(1.5 - np.abs(4.0 * t - 1.0), 0.0, 1.0)
+    return (np.stack([r, g, b], axis=-1) * 255).astype(np.uint8)

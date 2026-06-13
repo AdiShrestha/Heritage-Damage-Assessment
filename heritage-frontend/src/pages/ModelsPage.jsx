@@ -23,6 +23,16 @@ const details = {
     parameters: '86M',
     inputSize: '384×384',
   },
+  moe: {
+    description: 'Mixture of Experts (MoE) ensemble routing input dynamically to specialized sub-networks (ResNet, EfficientNet, ViT, YOLO) to minimize error. Supports temporal comparison, uncertainty estimation, and structured reports.',
+    parameters: '130M+ (Ensemble)',
+    inputSize: 'Multi-scale',
+  },
+  yolo_damage: {
+    description: 'YOLO-based object detector trained to localize and box structural damage cracks, weathering, and spalling.',
+    parameters: '46M',
+    inputSize: '640×640',
+  },
 };
 
 function SkeletonCard() {
