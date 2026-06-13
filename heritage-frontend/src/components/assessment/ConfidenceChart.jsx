@@ -19,9 +19,9 @@ function CustomTooltip({ active, payload }) {
   const item = payload[0].payload;
 
   return (
-    <div className="rounded-lg border border-stone-custom-light bg-white px-3 py-2 text-sm shadow-elevated">
-      <p className="font-display font-semibold text-text">{item.class_name}</p>
-      <p className="text-text-muted">{item.percentage.toFixed(1)}%</p>
+    <div className="rounded-lg border border-[#d8c5b6] bg-[#fffaf3] px-3 py-2 text-sm shadow-elevated">
+      <p className="font-display font-semibold text-[#251c19]">{item.class_name}</p>
+      <p className="text-[#796a62]">{item.percentage.toFixed(1)}%</p>
     </div>
   );
 }
@@ -34,12 +34,12 @@ export function ConfidenceChart({ probabilities }) {
 
   return (
     <div>
-      <p className="mb-3 text-xs font-semibold tracking-wide uppercase text-text-muted">
+      <p className="mb-3 text-xs font-semibold tracking-[0.16em] uppercase text-[#9b6b57]">
         Class Probabilities
       </p>
       <ResponsiveContainer width="100%" height={160}>
         <BarChart layout="vertical" data={data} margin={{ top: 0, right: 30, bottom: 0, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#E2DCD6" horizontal={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#E3D4C6" horizontal={false} />
           <XAxis
             type="number"
             domain={[0, 100]}
@@ -53,7 +53,7 @@ export function ConfidenceChart({ probabilities }) {
             width={120}
             axisLine={false}
             tickLine={false}
-            tick={{ fill: '#7A726C', fontSize: 12, textAnchor: 'end' }}
+            tick={{ fill: '#796A62', fontSize: 12, textAnchor: 'end' }}
           />
           <Tooltip content={<CustomTooltip />} />
           <Bar dataKey="percentage" radius={[0, 8, 8, 0]}>
@@ -64,7 +64,7 @@ export function ConfidenceChart({ probabilities }) {
               dataKey="percentage"
               position="right"
               formatter={(value) => `${value.toFixed(1)}%`}
-              fill="#7A726C"
+              fill="#796A62"
             />
           </Bar>
         </BarChart>

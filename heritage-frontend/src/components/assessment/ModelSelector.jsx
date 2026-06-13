@@ -21,7 +21,7 @@ export function ModelSelector({ value, onChange, models, disabled = false }) {
 
   return (
     <div>
-      <label htmlFor="model-select" className="mb-2 block text-sm font-semibold text-text">
+      <label htmlFor="model-select" className="mb-2 block text-sm font-semibold text-[#251c19]">
         Model
       </label>
       <select
@@ -29,7 +29,7 @@ export function ModelSelector({ value, onChange, models, disabled = false }) {
         value={value}
         onChange={(event) => onChange(event.target.value)}
         disabled={disabled}
-        className="w-full rounded-lg border border-stone-custom-light bg-white px-4 py-3 text-sm text-text outline-none transition-colors duration-150 ease-in-out focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-stone-50"
+        className="w-full rounded-lg border border-[#d8c5b6] bg-[#fffaf3] px-4 py-3 text-sm text-[#251c19] outline-none transition duration-200 ease-in-out focus:border-[#a4432d] focus:bg-white focus:ring-2 focus:ring-[#a4432d]/15 disabled:cursor-not-allowed disabled:bg-stone-50"
       >
         {MODELS.map((modelName) => {
           const loaded = loadedLookup.get(modelName);
@@ -41,7 +41,7 @@ export function ModelSelector({ value, onChange, models, disabled = false }) {
         })}
       </select>
 
-      <p className="mt-2 text-xs leading-5 text-text-muted">{getDescription(value)}</p>
+      <p className="mt-2 text-xs leading-5 text-[#796a62]">{getDescription(value)}</p>
     </div>
   );
 }
