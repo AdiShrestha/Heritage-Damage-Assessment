@@ -6,8 +6,10 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from PIL import Image
 import io
+import asyncio
 
 from app.main import app
+from app.ml.model_registry import model_registry
 
 
 @pytest.fixture
@@ -17,6 +19,10 @@ def anyio_backend():
 
 @pytest.fixture
 async def client():
+    # Manually load models because ASGITransport might not run lifespan properly in some versions
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, model_registry.load_all)
+    
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 

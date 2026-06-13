@@ -20,7 +20,7 @@ class PreprocessingPipeline:
     def __init__(self, image_size: tuple[int, int] = DEFAULT_IMAGE_SIZE) -> None:
         self.image_size = image_size
 
-    def preprocess(self, image: Any) -> dict[str, Any]:
+    def preprocess(self, image: Any, target_size: tuple[int, int] | None = None) -> dict[str, Any]:
         """Preprocess a PIL.Image.Image and optionally return a torch tensor."""
         if not hasattr(image, "convert"):
             raise PreprocessingError("Invalid image type for preprocessing.")
@@ -30,7 +30,8 @@ class PreprocessingPipeline:
         if pil.width < 32 or pil.height < 32:
             raise PreprocessingError("Image too small for processing.")
 
-        resized = pil.resize(self.image_size, Image.Resampling.LANCZOS)
+        size = target_size or self.image_size
+        resized = pil.resize(size, Image.Resampling.LANCZOS)
         preprocessed_pil = resized.copy()
 
         img_array = np.array(resized).astype(np.float32) / 255.0

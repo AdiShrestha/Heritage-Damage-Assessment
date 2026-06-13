@@ -50,7 +50,7 @@ export const CLASS_CONFIG = {
   },
 };
 
-export const MODELS = ['mock', 'resnet50', 'efficientnet_b4', 'vit_b16'];
+export const MODELS = ['moe', 'resnet50', 'efficientnet_b4', 'vgg16', 'vit_b16', 'mock'];
 
 export const SPACING = {
   screen: 16,

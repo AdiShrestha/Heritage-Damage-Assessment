@@ -39,7 +39,7 @@ async def predict_damage(
     file: UploadFile = File(..., description="Image file (JPEG/PNG/WebP, max 10MB)"),
     model_name: str = Query(
         default="moe",
-        description="Model to use: mock | resnet50 | efficientnet_b4 | vit_b16 | moe | yolo_damage",
+        description="Model to use: mock | resnet50 | efficientnet_b4 | vgg16 | vit_b16 | moe | yolo_damage",
     ),
     request_id: str = Depends(get_request_id),
     image_service: ImageService = Depends(get_image_service),

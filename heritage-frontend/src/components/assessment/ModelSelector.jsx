@@ -5,6 +5,10 @@ function getDescription(modelName) {
     return 'Placeholder model. Returns simulated results instantly.';
   }
 
+  if (modelName === 'moe') {
+    return 'MoE Ensemble · Mixture of 4 experts, learned gating · Best accuracy.';
+  }
+
   if (modelName === 'resnet50') {
     return 'ResNet-50 · 25M params · Fast inference · Strong baseline.';
   }
@@ -12,8 +16,12 @@ function getDescription(modelName) {
   if (modelName === 'efficientnet_b4') {
     return 'EfficientNet-B4 · 19M params · Best accuracy/speed tradeoff.';
   }
+  
+  if (modelName === 'vgg16') {
+    return 'VGG-16 · 138M params · Classic deep CNN, strong baseline.';
+  }
 
-  return 'Vision Transformer B/16 · 86M params · Highest accuracy.';
+  return 'Vision Transformer B/16 · 86M params · High accuracy.';
 }
 
 export function ModelSelector({ value, onChange, models, disabled = false }) {

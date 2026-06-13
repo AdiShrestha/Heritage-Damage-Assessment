@@ -51,6 +51,7 @@ backbones through a learned gating network:
 |------------------|-------------------|-------------|---------------------------|
 | ResNet-50        | torchvision       | 2 048       | `resnet50_best.pth`       |
 | EfficientNet-B4  | torchvision       | 1 792       | `efficientnet_b4_best.pth`|
+| VGG-16           | torchvision       | 4096        | `vgg16_best.pth`          |
 | ViT-B/16         | timm              | 768         | `vit_b16_best.pth`        |
 | YOLO Damage      | custom CNN / YOLO | 256         | `yolo_damage_best.pth`    |
 
@@ -187,7 +188,7 @@ All three sub-projects share a unified three-class system:
   comparison, expert disagreement detection, and batch processing.
 - **API Surface (Backend):** All REST endpoints (predict, batch, compare, report, health,
   models, cache) are implemented with Pydantic schemas, dependency injection, error
-  handling, and middleware.
+  handling, and middleware. Standalone endpoints for ResNet-50, EfficientNet-B4, and VGG-16 are available.
 - **Web Frontend:** Fully functional Assess, Models, and About pages with image upload,
   model selection, result display (including GradCAM viewer and confidence chart), error
   handling, and loading states. Custom hooks handle all API communication.
@@ -199,11 +200,11 @@ All three sub-projects share a unified three-class system:
 
 ### 6.2 What Is Partially Complete or Needs Attention
 
-- **Model Weights:** Only `resnet50_best.pth` (~490 MB) is present in the `weights/`
-  directory. The remaining four weight files (`efficientnet_b4_best.pth`, `vit_b16_best.pth`,
+- **Model Weights:** Only `resnet50_best.pth` (~490 MB), `efficientnet_b4_best.pth`, and `vgg16_best.pth` are present in the `weights/`
+  directory. The remaining weight files (`vit_b16_best.pth`,
   `yolo_damage_best.pth`, `gate_best.pth`) are missing. The MoE ensemble initialises those
   experts with random weights and logs warnings when they are absent — inference will run
-  but produce unreliable results for any expert beyond ResNet.
+  but produce unreliable results for any expert beyond ResNet and EfficientNet-B4.
 - **Test Coverage:** Only two test files exist (`test_health.py`, `test_predict.py`). There
   are no tests for batch processing, temporal comparison, report generation, cache service,
   or any of the ML modules.

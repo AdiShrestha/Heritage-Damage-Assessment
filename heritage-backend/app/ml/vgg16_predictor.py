@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""EfficientNet predictor with EMA inference and Grad-CAM support."""
+"""VGG-16 predictor with EMA inference and Grad-CAM support."""
 
 from pathlib import Path
 from typing import Any
@@ -11,8 +11,8 @@ from app.ml.base_predictor import BasePredictor, PredictionResult
 from app.utils.constants import CLASS_NAMES, NUM_CLASSES
 
 
-class EfficientNetPredictor(BasePredictor):
-    """EfficientNetB4 predictor backed by trained weights."""
+class VGG16Predictor(BasePredictor):
+    """VGG-16 predictor backed by trained weights."""
 
     def __init__(self) -> None:
         self._model = None
@@ -24,7 +24,7 @@ class EfficientNetPredictor(BasePredictor):
         self._logger = get_logger(__name__)
 
     def load_model(self, weights_path: Path | None = None) -> None:
-        """Load trained EfficientNetB4 weights and EMA state."""
+        """Load trained VGG-16 weights and EMA state."""
         try:
             import torch
             import torch.nn as nn
@@ -34,7 +34,7 @@ class EfficientNetPredictor(BasePredictor):
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
 
             if weights_path is None or not weights_path.exists():
-                self._logger.warning("EfficientNetB4 weights not found at %s. Predictor inactive.", weights_path)
+                self._logger.warning("VGG-16 weights not found at %s. Predictor inactive.", weights_path)
                 self._loaded = False
                 self._model = None
                 self._ema = None
@@ -42,11 +42,16 @@ class EfficientNetPredictor(BasePredictor):
                 self._best_f1 = None
                 return
 
-            model = models.efficientnet_b4(weights=None)
-            in_features = model.classifier[1].in_features
+            model = models.vgg16(weights=None)
+            # Replace entire classifier
             model.classifier = nn.Sequential(
-                nn.Dropout(0.4),
-                nn.Linear(in_features, NUM_CLASSES),
+                nn.BatchNorm1d(25088),
+                nn.Dropout(0.5),
+                nn.Linear(25088, 512),
+                nn.ReLU(inplace=True),
+                nn.BatchNorm1d(512),
+                nn.Dropout(0.3),
+                nn.Linear(512, NUM_CLASSES),
             )
 
             ckpt = torch.load(weights_path, map_location=self._device)
@@ -59,7 +64,7 @@ class EfficientNetPredictor(BasePredictor):
                 self._ema = ema
             else:
                 self._ema = None
-                self._logger.info("EfficientNetB4 loaded without EMA state.")
+                self._logger.info("VGG-16 loaded without EMA state.")
 
             self._epoch = int(ckpt.get("epoch", -1)) + 1 if "epoch" in ckpt else None
             self._best_f1 = ckpt.get("best_f1")
@@ -70,7 +75,7 @@ class EfficientNetPredictor(BasePredictor):
             self._model = model
             self._loaded = True
             self._logger.info(
-                "EfficientNetB4 loaded from %s on %s (epoch %s, best_f1=%s)",
+                "VGG-16 loaded from %s on %s (epoch %s, best_f1=%s)",
                 weights_path,
                 self._device,
                 self._epoch,
@@ -84,7 +89,7 @@ class EfficientNetPredictor(BasePredictor):
             self._epoch = None
             self._best_f1 = None
         except Exception as exc:
-            self._logger.error("Failed to load EfficientNetB4: %s", str(exc))
+            self._logger.error("Failed to load VGG-16: %s", str(exc))
             self._loaded = False
             self._model = None
             self._ema = None
@@ -92,9 +97,9 @@ class EfficientNetPredictor(BasePredictor):
             self._best_f1 = None
 
     def predict(self, image: Any) -> PredictionResult:
-        """Run inference using the EMA-averaged EfficientNetB4 weights if available."""
+        """Run inference using the EMA-averaged VGG-16 weights if available."""
         if not self._loaded or self._model is None:
-            raise InferenceError("EfficientNetB4 weights not loaded.")
+            raise InferenceError("VGG-16 weights not loaded.")
 
         import numpy as np
         import torch
@@ -104,8 +109,7 @@ class EfficientNetPredictor(BasePredictor):
             raise InferenceError("Invalid image supplied for inference.")
 
         pil_image: Image.Image = image.convert("RGB") if image.mode != "RGB" else image.copy()
-        # Native input size for EfficientNet-B4 is 380x380
-        resized = pil_image.resize((380, 380), Image.Resampling.LANCZOS)
+        resized = pil_image.resize((224, 224), Image.Resampling.LANCZOS)
         image_array = np.array(resized).astype(np.float32) / 255.0
         mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
@@ -158,7 +162,7 @@ class EfficientNetPredictor(BasePredictor):
                 cam = GradCAM(model=self._model, target_layers=[self._model.features[-1]])
                 grayscale_cam = cam(input_tensor=input_tensor)[0]
 
-            rgb_image = original_pil_image.convert("RGB").resize((380, 380), Image.Resampling.LANCZOS)
+            rgb_image = original_pil_image.convert("RGB").resize((224, 224), Image.Resampling.LANCZOS)
             rgb_float = np.asarray(rgb_image).astype(np.float32) / 255.0
             rgb_float = np.clip(rgb_float, 0.0, 1.0)
             overlay = show_cam_on_image(rgb_float, grayscale_cam, use_rgb=True)
@@ -172,7 +176,7 @@ class EfficientNetPredictor(BasePredictor):
 
     @property
     def model_name(self) -> str:
-        return "efficientnet_b4"
+        return "vgg16"
 
     @property
     def model_version(self) -> str:

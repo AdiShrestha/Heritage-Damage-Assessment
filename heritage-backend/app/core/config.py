@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     TORCH_DEVICE: str = "cuda"
     MAX_IMAGE_SIZE_MB: float = 10.0
     DEFAULT_MODEL: str = "moe"
-    ENABLED_MODELS: str = "mock,resnet50,efficientnet_b4,vit_b16,yolo_damage,moe"
+    ENABLED_MODELS: str = "mock,resnet50,efficientnet_b4,vit_b16,yolo_damage,moe,vgg16"
     MODEL_WEIGHTS_DIR: Path = Path("weights/")
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: Literal["json", "text"] = "json"
@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     CACHE_MAX_ENTRIES: int = 512
     MC_DROPOUT_PASSES: int = 15
     WARMUP_ON_STARTUP: bool = True
+    VGG16_INPUT_SIZE: int = 224
+    EFFICIENTNET_B4_INPUT_SIZE: int = 380
 
     @property
     def allowed_origins_list(self) -> list[str]:

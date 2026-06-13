@@ -2,17 +2,21 @@ import { Text, View } from 'react-native';
 import { MODELS, SPACING, THEME } from '../constants';
 
 const modelDescriptions = {
-  mock: 'Placeholder model. Returns simulated results instantly.',
-  resnet50: 'ResNet-50 · 25M params · Fast inference · Strong baseline.',
-  efficientnet_b4: 'EfficientNet-B4 · 19M params · Best accuracy/speed tradeoff.',
-  vit_b16: 'Vision Transformer B/16 · 86M params · Highest accuracy.',
+  moe: 'MoE Ensemble · Mixture of 4 experts · Best accuracy.',
+  resnet50: 'ResNet-50 · 25M params · Strong baseline.',
+  efficientnet_b4: 'EfficientNet-B4 · 19M params · Best tradeoff.',
+  vgg16: 'VGG-16 · 138M params · Classic deep CNN.',
+  vit_b16: 'ViT-B/16 · 86M params · High accuracy.',
+  mock: 'Returns simulated results instantly.',
 };
 
 const modelNames = {
+  moe: 'MoE',
+  resnet50: 'RN50',
+  efficientnet_b4: 'EN-B4',
+  vgg16: 'VGG16',
+  vit_b16: 'ViT',
   mock: 'Mock',
-  resnet50: 'ResNet-50',
-  efficientnet_b4: 'EfficientNet-B4',
-  vit_b16: 'ViT-B/16',
 };
 
 function SegmentedControl({ value, onChange, disabled, options }) {
