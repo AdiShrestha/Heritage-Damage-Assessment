@@ -219,12 +219,7 @@ class PredictionService:
             preprocessed = await loop.run_in_executor(
                 None, self._preprocessing.preprocess, image
             )
-            input_data = (
-                preprocessed["tensor"]
-                if preprocessed.get("tensor") is not None
-                else image
-            )
-            result = await loop.run_in_executor(None, predictor.predict, input_data)
+            result = await loop.run_in_executor(None, predictor.predict, image)
         except (InferenceError, PreprocessingError):
             raise
         except Exception as e:

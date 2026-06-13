@@ -8,7 +8,7 @@ export async function predict(file, modelName) {
     name: file.fileName || 'image.jpg',
   });
 
-  return client.post(`/predict?model_name=${encodeURIComponent(modelName)}`, formData, {
+  return client.post(`/predict/?model_name=${encodeURIComponent(modelName)}`, formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },

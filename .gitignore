@@ -10,6 +10,11 @@ Thumbs.db
 *.swo
 *~
 
+heritage-backend/.myenv/
+heritage-frontend/node_modules/
+heritage-mobile/node_modules/
+heritage-backend/weights/
+
 # IDE & Editors
 .vscode/
 .idea/
