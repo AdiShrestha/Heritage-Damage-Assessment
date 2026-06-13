@@ -19,9 +19,9 @@ export default function App() {
         toastOptions={{
           duration: 3500,
           style: {
-            borderRadius: '12px',
-            background: '#1C1816',
-            color: '#F5F0EB',
+            borderRadius: "12px",
+            background: "#1C1816",
+            color: "#F5F0EB",
           },
         }}
       />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Menu } from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
 import { useHealth } from '../../hooks/useHealth';
 
 function getStatusCopy(status) {
@@ -39,8 +39,8 @@ export function Navbar() {
   }, [location.pathname]);
 
   const navClass = ({ isActive }) =>
-    `text-xs lg:text-sm tracking-wide transition-colors duration-150 ease-in-out ${
-      isActive ? 'font-semibold text-[#F7EDE8]' : 'text-[#E2DCD6] hover:text-[#F7EDE8]'
+    `rounded-lg px-4 py-2 text-sm font-medium tracking-wide transition-all duration-200 ease-out ${
+      isActive ? 'bg-[#251c19] text-[#fff8ee] shadow-sm' : 'text-[#66564e] hover:bg-[#f3e5d5] hover:text-[#251c19]'
     }`;
 
   return (
@@ -54,13 +54,13 @@ export function Navbar() {
             <div className="font-display text-sm md:text-base font-semibold tracking-tight text-[#F5F0EB]">
               Heritage Assessment
             </div>
-            <div className="text-3xs text-[#A69A92] font-display italic">
-              AI Mixture of Experts
+            <div className="text-xs text-[#8b6e61] font-display italic">
+              AI-Powered Damage Detection
             </div>
           </div>
         </NavLink>
 
-        <nav className="hidden items-center gap-4 lg:gap-6 md:flex">
+        <nav className="hidden items-center gap-1 rounded-xl border border-[#e3d4c6] bg-white/65 p-1 md:flex">
           <NavLink to="/" end className={navClass}>
             Assess
           </NavLink>
@@ -84,16 +84,24 @@ export function Navbar() {
           </NavLink>
         </nav>
 
-        <div className="flex items-center gap-3 ml-auto">
-          <div className="flex items-center gap-1.5 text-xs text-[#E2DCD6]">
-            <span className={`h-1.5 w-1.5 rounded-full ${getDotClass(status)} ${status === 'ok' ? 'animate-pulse' : ''}`} />
-            <span className="hidden md:inline">{getStatusCopy(status)}</span>
+        <div className="flex items-center gap-4">
+          <button
+            type="button"
+            className="hidden h-10 w-10 items-center justify-center rounded-lg border border-[#dfcfc0] bg-white/70 text-[#65554d] transition duration-200 hover:border-[#a4432d] hover:text-[#a4432d] sm:inline-flex"
+            aria-label="Notifications"
+          >
+            <Bell className="h-4 w-4" />
+          </button>
+
+          <div className="flex items-center gap-2 rounded-full border border-[#dfcfc0] bg-white/70 px-3 py-2 text-sm text-[#65554d]">
+            <span className={`h-2 w-2 rounded-full ${getDotClass(status)} ${status === 'ok' ? 'animate-pulse' : ''}`} />
+            <span className="hidden sm:inline">{getStatusCopy(status)}</span>
           </div>
 
           <button
             type="button"
             onClick={() => setMobileOpen((value) => !value)}
-            className="inline-flex items-center justify-center rounded-lg border border-white/15 p-2 text-[#E2DCD6] transition-colors duration-150 ease-in-out hover:bg-white/10 md:hidden"
+            className="inline-flex items-center justify-center rounded-lg border border-[#dfcfc0] bg-white/70 p-2 text-[#65554d] transition-colors duration-150 ease-in-out hover:text-[#a4432d] md:hidden"
             aria-label="Open navigation menu"
           >
             <Menu className="h-4 w-4" />
@@ -101,11 +109,9 @@ export function Navbar() {
         </div>
       </div>
 
-      <div className="h-[2px] bg-gradient-to-r from-[#A63A2A] via-[#D4A04A] to-[#A63A2A]" />
-
       {mobileOpen ? (
-        <div className="border-t border-white/10 bg-[#1C1816] px-4 py-3 md:hidden">
-          <div className="mx-auto flex max-w-[1100px] flex-col gap-2.5">
+        <div className="mx-auto mt-2 max-w-[1280px] rounded-2xl border border-[#d7c3b1] bg-[#fffaf3]/95 px-4 py-3 shadow-lg backdrop-blur-xl md:hidden">
+          <div className="flex flex-col gap-2">
             <NavLink to="/" end className={navClass}>
               Assess
             </NavLink>
