@@ -1,6 +1,5 @@
-from __future__ import annotations
-
 """Model registry holding all available predictors."""
+from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
@@ -13,6 +12,9 @@ from app.ml.mock_predictor import MockPredictor
 from app.ml.resnet_predictor import ResNetPredictor
 from app.ml.efficientnet_predictor import EfficientNetPredictor
 from app.ml.vit_predictor import ViTPredictor
+from app.ml.yolo_predictor import YOLOPredictor
+from app.ml.moe_predictor import MoEPredictor
+
 
 logger = get_logger(__name__)
 
@@ -25,10 +27,32 @@ class ModelRegistry:
         self._register_defaults()
 
     def _register_defaults(self) -> None:
-        self.register("mock", MockPredictor())
-        self.register("resnet50", ResNetPredictor())
-        self.register("efficientnet_b4", EfficientNetPredictor())
-        self.register("vit_b16", ViTPredictor())
+        enabled = set(settings.enabled_models_list)
+        known = {"mock", "resnet50", "efficientnet_b4", "vit_b16", "yolo_damage", "moe"}
+
+        if not enabled:
+            enabled = {"mock"}
+
+        for unknown in sorted(enabled - known):
+            logger.warning("Unknown model in ENABLED_MODELS ignored: %s", unknown)
+
+        if "mock" in enabled:
+            self.register("mock", MockPredictor())
+        if "resnet50" in enabled:
+            self.register("resnet50", ResNetPredictor())
+        if "efficientnet_b4" in enabled:
+            self.register("efficientnet_b4", EfficientNetPredictor())
+        if "vit_b16" in enabled:
+            self.register("vit_b16", ViTPredictor())
+        if "yolo_damage" in enabled:
+            self.register("best", YOLOPredictor())
+
+        if "moe" in enabled:
+            self.register("moe", MoEPredictor())
+
+        if not self._registry:
+            logger.warning("No valid models enabled; falling back to mock predictor.")
+            self.register("mock", MockPredictor())
 
     def register(self, name: str, predictor: BasePredictor) -> None:
         self._registry[name] = predictor
@@ -52,6 +76,8 @@ class ModelRegistry:
             "resnet50": weights_dir / "resnet50_best.pth",
             "efficientnet_b4": weights_dir / "efficientnet_b4_best.pth",
             "vit_b16": weights_dir / "vit_b16_best.pth",
+            "yolo_damage": weights_dir / "yolo_damage_best.pth",
+            "moe": weights_dir,  # pass the directory, not a file
         }
         for name, predictor in self._registry.items():
             path = weight_map.get(name)

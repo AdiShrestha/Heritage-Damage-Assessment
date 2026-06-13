@@ -38,6 +38,14 @@ async def test_predict_model_param(client, sample_jpeg_bytes):
 
 
 @pytest.mark.anyio
+async def test_predict_model_param_moe(client, sample_jpeg_bytes):
+    files = {"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")}
+    r = await client.post("/api/v1/predict/?model_name=moe", files=files)
+    assert r.status_code == 200
+    assert r.json().get("model_used") == "moe"
+
+
+@pytest.mark.anyio
 async def test_predict_nonexistent_model(client, sample_jpeg_bytes):
     files = {"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")}
     r = await client.post("/api/v1/predict/?model_name=doesnotexist", files=files)
