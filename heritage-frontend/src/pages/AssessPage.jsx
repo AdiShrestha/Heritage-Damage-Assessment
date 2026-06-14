@@ -344,11 +344,9 @@ export default function AssessPage() {
                   <MiniTempleIcon className="h-8 w-8" />
                 </span>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9b6b57]">
-                    Kathmandu Valley
-                  </p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9b6b57]"></p>
                   <h1 className="font-display text-2xl font-semibold text-[#251c19]">
-                    Damage Assessment
+                    Heritage Damage Assessment
                   </h1>
                 </div>
               </div>
