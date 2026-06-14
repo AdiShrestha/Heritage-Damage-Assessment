@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""ResNet50 predictor — EMA optional (graceful if torch_ema not installed)."""
+"""ResNet50 predictor — weights loaded from Hugging Face Hub, local fallback."""
 
 from pathlib import Path
 from typing import Any
@@ -22,6 +22,9 @@ class ResNetPredictor(BasePredictor):
         self._epoch: int | None = None
         self._best_f1: float | None = None
 
+    _HF_REPO_ID = "monarch8661/moe"
+    _HF_FILENAME = "resnet50_best.pth"
+
     def load_model(self, weights_path: Path | None = None) -> None:
         try:
             import torch
@@ -30,10 +33,10 @@ class ResNetPredictor(BasePredictor):
 
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
 
-            if weights_path is None or not weights_path.exists():
-                logger.warning(
-                    "ResNet50 weights not found at %s — inactive.", weights_path
-                )
+            # ── Resolve weights: HF Hub (primary) → local fallback → skip ─────
+            resolved_path = self._resolve_weights(weights_path)
+            if resolved_path is None:
+                logger.warning("ResNet50 weights unavailable — inactive.")
                 return
 
             # ── Build model ───────────────────────────────────────────────────
@@ -50,7 +53,7 @@ class ResNetPredictor(BasePredictor):
 
             # ── Load checkpoint ───────────────────────────────────────────────
             # Checkpoint is {"model_state": …, "ema_state": …, "epoch": …, …}
-            ckpt = torch.load(weights_path, map_location=self._device)
+            ckpt = torch.load(resolved_path, map_location=self._device)
             state = ckpt.get("model_state", ckpt)  # fall back if plain state dict
             model.load_state_dict(state, strict=True)
             self._epoch = int(ckpt.get("epoch", -1)) + 1
@@ -69,7 +72,7 @@ class ResNetPredictor(BasePredictor):
                 self._ema = ema
                 logger.info(
                     "ResNet50 loaded WITH EMA from %s (epoch %s, F1=%.4f)",
-                    weights_path,
+                    resolved_path,
                     self._epoch,
                     self._best_f1 or 0,
                 )
@@ -81,7 +84,7 @@ class ResNetPredictor(BasePredictor):
                 )
                 logger.info(
                     "ResNet50 loaded (no EMA) from %s (epoch %s, F1=%.4f)",
-                    weights_path,
+                    resolved_path,
                     self._epoch,
                     self._best_f1 or 0,
                 )
@@ -94,6 +97,30 @@ class ResNetPredictor(BasePredictor):
             self._loaded = False
             self._model = None
             self._ema = None
+
+    def _resolve_weights(self, weights_path: Path | None) -> Path | None:
+        """Try HF Hub download first, then local path, then give up."""
+        # 1. Primary: Hugging Face Hub
+        try:
+            from huggingface_hub import hf_hub_download
+
+            local = hf_hub_download(
+                repo_id=self._HF_REPO_ID,
+                filename=self._HF_FILENAME,
+                cache_dir="/tmp/hf_cache",
+            )
+            logger.info("ResNet50 weights downloaded from HF Hub")
+            return Path(local)
+        except Exception as e:
+            logger.debug("HF Hub download failed for ResNet50: %s", e)
+
+        # 2. Fallback: local weights path
+        if weights_path is not None and weights_path.exists():
+            logger.info("Using local ResNet50 weights at %s", weights_path)
+            return weights_path
+
+        # 3. Neither available
+        return None
 
     def predict(self, image: Any) -> PredictionResult:
         if not self._loaded or self._model is None:

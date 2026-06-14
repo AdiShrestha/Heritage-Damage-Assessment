@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""YOLO fallback predictor (Custom CNN) — aligned to temple classification output, includes Grad-CAM."""
+"""YOLO fallback predictor (Custom CNN) — weights loaded from Hugging Face Hub, local fallback."""
 
 from pathlib import Path
 from typing import Any
@@ -56,30 +56,57 @@ class YOLOPredictor(BasePredictor):
         self._device = "cpu"
         self._weights_name: str = "not-loaded"
 
+    _HF_REPO_ID = "monarch8661/moe"
+    _HF_FILENAME = "yolo_damage_best.pth"
+
     def load_model(self, weights_path: Path | None = None) -> None:
         """Load trained model weights."""
         try:
-            if weights_path is None or not weights_path.exists():
-                logger.warning(
-                    "YOLO weights not found at %s. Predictor inactive.", weights_path
-                )
+            # ── Resolve weights: HF Hub (primary) → local fallback → skip ─────
+            resolved_path = self._resolve_weights(weights_path)
+            if resolved_path is None:
+                logger.warning("YOLO weights unavailable — inactive.")
                 self._loaded = False
                 return
 
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
             self._model = _YOLOFallback().to(self._device)
             
-            ckpt = torch.load(weights_path, map_location=self._device)
+            ckpt = torch.load(resolved_path, map_location=self._device)
             state = ckpt.get("model_state", ckpt)
             self._model.load_state_dict(state, strict=False)
             self._model.eval()
 
-            self._weights_name = weights_path.name
+            self._weights_name = Path(resolved_path).name
             self._loaded = True
-            logger.info("YOLO (fallback CNN) classifier loaded from %s", weights_path)
+            logger.info("YOLO (fallback CNN) classifier loaded from %s", resolved_path)
         except Exception as e:
             logger.error("Failed to load YOLO fallback: %s", str(e), exc_info=True)
             self._loaded = False
+
+    def _resolve_weights(self, weights_path: Path | None) -> Path | None:
+        """Try HF Hub download first, then local path, then give up."""
+        # 1. Primary: Hugging Face Hub
+        try:
+            from huggingface_hub import hf_hub_download
+
+            local = hf_hub_download(
+                repo_id=self._HF_REPO_ID,
+                filename=self._HF_FILENAME,
+                cache_dir="/tmp/hf_cache",
+            )
+            logger.info("YOLO weights downloaded from HF Hub")
+            return Path(local)
+        except Exception as e:
+            logger.debug("HF Hub download failed for YOLO: %s", e)
+
+        # 2. Fallback: local weights path
+        if weights_path is not None and weights_path.exists():
+            logger.info("Using local YOLO weights at %s", weights_path)
+            return weights_path
+
+        # 3. Neither available
+        return None
 
     def predict(self, image: Any) -> PredictionResult:
         if not self._loaded or self._model is None:

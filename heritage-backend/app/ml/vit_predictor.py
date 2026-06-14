@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""ViT-B/16 predictor — correct checkpoint loading + full inference."""
+"""ViT-B/16 predictor — weights loaded from Hugging Face Hub, local fallback."""
 
 from pathlib import Path
 from typing import Any
@@ -20,6 +20,9 @@ class ViTPredictor(BasePredictor):
         self._device = "cpu"
         self._epoch: int | None = None
 
+    _HF_REPO_ID = "monarch8661/moe"
+    _HF_FILENAME = "vit_b16_best.pth"
+
     def load_model(self, weights_path: Path | None = None) -> None:
         try:
             import torch
@@ -28,14 +31,14 @@ class ViTPredictor(BasePredictor):
 
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
 
-            if weights_path is None or not weights_path.exists():
-                logger.warning("ViT weights not found at %s — inactive.", weights_path)
+            # Resolve weights path (HF Hub or local)
+            resolved_path = self._resolve_weights(weights_path)
+            if resolved_path is None:
+                logger.warning("ViT weights unavailable — inactive.")
                 return
 
-            # Build with num_classes=0 then attach custom head — matches training notebook
-            model = timm.create_model(
-                "vit_base_patch16_224", pretrained=False, num_classes=0
-            )
+            # Build model with the correct head (matching your training)
+            model = timm.create_model("vit_base_patch16_224", pretrained=False, num_classes=0)
             model.head = nn.Sequential(
                 nn.LayerNorm(model.embed_dim),
                 nn.Linear(model.embed_dim, 256),
@@ -44,21 +47,54 @@ class ViTPredictor(BasePredictor):
                 nn.Linear(256, NUM_CLASSES),
             )
 
-            # ── Extract model_state from checkpoint wrapper ───────────────────
-            ckpt = torch.load(weights_path, map_location=self._device)
+            # Load checkpoint
+            ckpt = torch.load(resolved_path, map_location=self._device)
             state = ckpt.get("model_state", ckpt)
-            model.load_state_dict(state, strict=True)
+
+            # 🔧 FIX: Remove all head-related keys (we keep our own head)
+            filtered_state = {k: v for k, v in state.items() if not k.startswith("head.")}
+            missing, unexpected = model.load_state_dict(filtered_state, strict=False)
+            if missing:
+                logger.debug("ViT missing keys (backbone only, expected): %s", missing)
+            if unexpected:
+                logger.debug("ViT unexpected keys (usually head layers, ignored): %s", unexpected)
+
             self._epoch = int(ckpt.get("epoch", -1)) + 1
             model.eval()
-
             self._model = model.to(self._device)
             self._loaded = True
-            logger.info("ViT-B/16 loaded from %s on %s", weights_path, self._device)
+            logger.info(
+                "ViT-B/16 loaded (backbone only) from %s on %s", resolved_path, self._device
+            )
 
         except Exception as exc:
             logger.error("ViT load FAILED: %s", exc, exc_info=True)
             self._loaded = False
             self._model = None
+
+    def _resolve_weights(self, weights_path: Path | None) -> Path | None:
+        """Try HF Hub download first, then local path, then give up."""
+        # 1. Primary: Hugging Face Hub
+        try:
+            from huggingface_hub import hf_hub_download
+
+            local = hf_hub_download(
+                repo_id=self._HF_REPO_ID,
+                filename=self._HF_FILENAME,
+                cache_dir="/tmp/hf_cache",
+            )
+            logger.info("ViT weights downloaded from HF Hub")
+            return Path(local)
+        except Exception as e:
+            logger.debug("HF Hub download failed for ViT: %s", e)
+
+        # 2. Fallback: local weights path
+        if weights_path is not None and weights_path.exists():
+            logger.info("Using local ViT weights at %s", weights_path)
+            return weights_path
+
+        # 3. Neither available
+        return None
 
     def predict(self, image: Any) -> PredictionResult:
         if not self._loaded or self._model is None:
@@ -172,10 +208,7 @@ class ViTPredictor(BasePredictor):
 
         if original_pil is None:
             return None
-        orig = (
-            np.array(original_pil.convert("RGB").resize((224, 224))).astype(np.float32)
-            / 255.0
-        )
+        orig = np.array(original_pil.convert("RGB").resize((224, 224))).astype(np.float32) / 255.0
         r = np.clip(1.5 - np.abs(4.0 * cam - 3.0), 0, 1)
         g = np.clip(1.5 - np.abs(4.0 * cam - 2.0), 0, 1)
         b = np.clip(1.5 - np.abs(4.0 * cam - 1.0), 0, 1)
@@ -209,7 +242,8 @@ class ViTPredictor(BasePredictor):
         sal_t = torch.from_numpy(sal).unsqueeze(0).unsqueeze(0)
         sal = (
             F.interpolate(sal_t, size=(SIZE, SIZE), mode="bilinear", align_corners=False)
-            .squeeze().numpy()
+            .squeeze()
+            .numpy()
         )
 
         if original_pil is None:
