@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-"""MoE ensemble predictor — proper Grad-CAM, ViT attention rollout,
-annotated composite visualization sent to frontend."""
+"""MoE ensemble predictor — weights loaded from Hugging Face Hub."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 import json
 
 from app.ml.base_predictor import BasePredictor, PredictionResult
@@ -14,30 +13,24 @@ from app.utils.constants import CLASS_NAMES, NUM_CLASSES, CRITICALITY_MAP
 
 logger = get_logger(__name__)
 
-# ── Visualization constants ───────────────────────────────────────────────────
-_IMG_SIZE = 224  # expert input size
-_BANNER_H = 52  # top banner height  (class + confidence)
-_EXPERT_BAR_H = 36  # bottom expert bar height
-_COMPOSITE_W = _IMG_SIZE * 2  # original | heatmap side by side
-
-# Criticality → RGBA border colour
+# Visualization constants (unchanged)
+_IMG_SIZE = 224
+_BANNER_H = 52
+_EXPERT_BAR_H = 36
+_COMPOSITE_W = _IMG_SIZE * 2
 _CRIT_COLOUR: dict[str, tuple] = {
-    "STABLE": (56, 161, 105),  # green
-    "MINOR": (236, 201, 75),  # yellow
-    "MODERATE": (237, 137, 54),  # orange
-    "CRITICAL": (229, 62, 62),  # red
-    "UNKNOWN": (160, 174, 192),  # grey
+    "STABLE": (56, 161, 105),
+    "MINOR": (236, 201, 75),
+    "MODERATE": (237, 137, 54),
+    "CRITICAL": (229, 62, 62),
+    "UNKNOWN": (160, 174, 192),
 }
-
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class MoEPredictor(BasePredictor):
     """
     Mixture-of-Experts predictor.
-    Weights directory must contain:
-      resnet50_best.pth, efficientnet_b4_best.pth, vit_b16_best.pth,
-      yolo_damage_best.pth, gate_best.pth, moe_manifest.json
+    Weights are loaded from Hugging Face Hub repository "monarch8661/moe".
     """
 
     def __init__(self) -> None:
@@ -53,9 +46,11 @@ class MoEPredictor(BasePredictor):
             "yolo_damage": 256,
         }
         self._expert_names: list[str] = []
+        self._hf_repo_id = "monarch8661/moe"   # public HF repo
 
-    # ─── load_model ──────────────────────────────────────────────────────────
-
+    # ------------------------------------------------------------------
+    # load_model – downloads weights from Hugging Face Hub
+    # ------------------------------------------------------------------
     def load_model(self, weights_path: Path | None = None) -> None:
         try:
             import torch
@@ -63,40 +58,37 @@ class MoEPredictor(BasePredictor):
             import torch.nn.functional as F
             import torchvision.models as tvm
             import timm
-            import re
+            from huggingface_hub import hf_hub_download
 
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
-            weights_dir = (
-                weights_path
-                if weights_path and weights_path.is_dir()
-                else Path("weights/")
-            )
+            logger.info("Loading MoE from Hugging Face repo: %s", self._hf_repo_id)
 
-            manifest_path = weights_dir / "moe_manifest.json"
-            if manifest_path.exists():
+            # ---- 1. Download and load manifest ---------------------------------
+            try:
+                manifest_path = hf_hub_download(
+                    repo_id=self._hf_repo_id,
+                    filename="moe_manifest.json",
+                    cache_dir="/tmp/hf_cache"
+                )
                 with open(manifest_path) as f:
                     manifest = json.load(f)
                 self._conf_threshold = manifest.get("conf_threshold", 0.70)
                 self._gate_hidden = manifest.get("gate_hidden", 256)
-                self._expert_feat_dims = manifest.get(
-                    "expert_feat_dims", self._expert_feat_dims
-                )
-                logger.info("MoE manifest loaded from %s", manifest_path)
+                self._expert_feat_dims = manifest.get("expert_feat_dims", self._expert_feat_dims)
+                logger.info("Manifest loaded.")
+            except Exception as e:
+                logger.warning("Manifest not found in HF repo: %s", e)
 
             n_classes = NUM_CLASSES
             dropout = 0.4
 
-            # ── Expert architectures (must match training notebook exactly) ──
-
+            # ---- 2. Expert architectures (same as before) ---------------------
             def _resnet50():
                 m = tvm.resnet50(weights=None)
                 m.fc = nn.Sequential(
-                    nn.BatchNorm1d(2048),
-                    nn.Dropout(dropout),
-                    nn.Linear(2048, 512),
-                    nn.ReLU(inplace=True),
-                    nn.BatchNorm1d(512),
-                    nn.Dropout(0.3),
+                    nn.BatchNorm1d(2048), nn.Dropout(dropout),
+                    nn.Linear(2048, 512), nn.ReLU(inplace=True),
+                    nn.BatchNorm1d(512), nn.Dropout(0.3),
                     nn.Linear(512, n_classes),
                 )
                 return m
@@ -106,21 +98,17 @@ class MoEPredictor(BasePredictor):
                 in_f = m.classifier[1].in_features
                 m.classifier = nn.Sequential(
                     nn.Dropout(dropout),
-                    nn.Linear(in_f, 512),
-                    nn.ReLU(inplace=True),
+                    nn.Linear(in_f, 512), nn.ReLU(inplace=True),
                     nn.Dropout(0.3),
                     nn.Linear(512, n_classes),
                 )
                 return m
 
             def _vit_b16():
-                m = timm.create_model(
-                    "vit_base_patch16_224", pretrained=False, num_classes=0
-                )
+                m = timm.create_model("vit_base_patch16_224", pretrained=False, num_classes=0)
                 m.head = nn.Sequential(
                     nn.LayerNorm(m.embed_dim),
-                    nn.Linear(m.embed_dim, 256),
-                    nn.GELU(),
+                    nn.Linear(m.embed_dim, 256), nn.GELU(),
                     nn.Dropout(dropout),
                     nn.Linear(256, n_classes),
                 )
@@ -130,26 +118,18 @@ class MoEPredictor(BasePredictor):
                 def __init__(self):
                     super().__init__()
                     self.backbone = nn.Sequential(
-                        nn.Conv2d(3, 64, 7, stride=2, padding=3),
-                        nn.BatchNorm2d(64),
-                        nn.ReLU(),
+                        nn.Conv2d(3, 64, 7, stride=2, padding=3), nn.BatchNorm2d(64), nn.ReLU(),
                         nn.MaxPool2d(3, stride=2, padding=1),
-                        nn.Conv2d(64, 128, 3, padding=1),
-                        nn.BatchNorm2d(128),
-                        nn.ReLU(),
-                        nn.Conv2d(128, 256, 3, padding=1),
-                        nn.BatchNorm2d(256),
-                        nn.ReLU(),
+                        nn.Conv2d(64, 128, 3, padding=1), nn.BatchNorm2d(128), nn.ReLU(),
+                        nn.Conv2d(128, 256, 3, padding=1), nn.BatchNorm2d(256), nn.ReLU(),
                         nn.AdaptiveAvgPool2d(1),
                     )
                     self.head = nn.Sequential(
                         nn.Flatten(),
-                        nn.Linear(256, 256),
-                        nn.ReLU(),
+                        nn.Linear(256, 256), nn.ReLU(),
                         nn.Dropout(0.3),
                         nn.Linear(256, n_classes),
                     )
-
                 def forward(self, x):
                     return self.head(self.backbone(x))
 
@@ -160,120 +140,105 @@ class MoEPredictor(BasePredictor):
                 "yolo_damage": _YOLOFallback,
             }
 
+            # ---- 3. Download and load each expert's weights --------------------
+            expert_models: dict[str, nn.Module] = {}
             weight_files = {
-                "resnet50": weights_dir / "resnet50_best.pth",
-                "efficientnet_b4": weights_dir / "efficientnet_b4_best.pth",
-                "vit_b16": weights_dir / "vit_b16_best.pth",
-                "yolo_damage": weights_dir / "yolo_damage_best.pth",
+                "resnet50": "resnet50_best.pth",
+                "efficientnet_b4": "efficientnet_b4_best.pth",
+                "vit_b16": "vit_b16_best.pth",
+                "yolo_damage": "yolo_damage_best.pth",
             }
 
-            expert_models: dict[str, nn.Module] = {}
             for name, builder in builders.items():
-                m = builder().to(self._device)
-                wpath = weight_files[name]
-                if wpath.exists():
-                    ckpt = torch.load(wpath, map_location=self._device)
+                model = builder().to(self._device)
+                try:
+                    local_path = hf_hub_download(
+                        repo_id=self._hf_repo_id,
+                        filename=weight_files[name],
+                        cache_dir="/tmp/hf_cache"
+                    )
+                    ckpt = torch.load(local_path, map_location=self._device)
                     state = ckpt.get("model_state", ckpt)
-                    m.load_state_dict(state, strict=False)
-                    logger.info("Expert %s loaded from %s", name, wpath)
-                else:
-                    logger.warning("Expert %s missing at %s — random init", name, wpath)
-                m.eval()
-                for p in m.parameters():
-                    p.requires_grad = True
-                expert_models[name] = m
 
-            # ── Feature extractor wrappers ────────────────────────────────────
+                    # Special handling for ViT: only load backbone, keep our head
+                    if name == "vit_b16":
+                        filtered = {k: v for k, v in state.items() if not k.startswith("head.")}
+                        model.load_state_dict(filtered, strict=False)
+                        logger.info("ViT backbone loaded from HF (head ignored)")
+                    else:
+                        model.load_state_dict(state, strict=False)
+
+                    logger.info("Expert %s loaded from HF", name)
+                except Exception as e:
+                    logger.warning("Expert %s load failed: %s — using random init", name, e)
+                model.eval()
+                for p in model.parameters():
+                    p.requires_grad = True
+                expert_models[name] = model
+
+            # ---- 4. Feature extractor wrappers (unchanged) --------------------
             class ExpertExtractor(nn.Module):
                 def __init__(self, model: nn.Module, name: str):
                     super().__init__()
                     self.model = model
                     self.name = name
-
                 def forward(self, x):
                     m = self.model
-                    if hasattr(m, "layer4"):  # ResNet
+                    if hasattr(m, "layer4"):          # ResNet
                         feats = nn.Sequential(*list(m.children())[:-1])(x).flatten(1)
                         logits = m.fc(feats)
-                    elif hasattr(m, "features"):  # EfficientNet
+                    elif hasattr(m, "features"):      # EfficientNet
                         feats = m.avgpool(m.features(x)).flatten(1)
                         logits = m.classifier(feats)
-                    elif hasattr(m, "blocks"):  # ViT
+                    elif hasattr(m, "blocks"):        # ViT
                         feats = m.forward_features(x)
                         feats = feats[:, 0] if feats.dim() == 3 else feats
                         logits = m.head(feats)
-                    else:  # YOLO fallback
+                    else:                             # YOLO fallback
                         feats = m.backbone(x).flatten(1)
                         logits = m.head(m.backbone(x))
                     return feats, logits
 
-            # ── Gating network ────────────────────────────────────────────────
+            # ---- 5. Gating network --------------------------------------------
             n_experts = len(builders)
             in_dim = sum(self._expert_feat_dims.values())
-            gate_proj = None
-            gate_input_dim = in_dim
             h = self._gate_hidden
 
             class Gate(nn.Module):
                 def __init__(self, input_dim: int, hidden: int, n: int):
                     super().__init__()
                     self.net = nn.Sequential(
-                        nn.Linear(input_dim, hidden),
-                        nn.GELU(),
-                        nn.Dropout(0.3),
-                        nn.Linear(hidden, hidden // 2),
-                        nn.GELU(),
-                        nn.Dropout(0.2),
+                        nn.Linear(input_dim, hidden), nn.GELU(), nn.Dropout(0.3),
+                        nn.Linear(hidden, hidden // 2), nn.GELU(), nn.Dropout(0.2),
                         nn.Linear(hidden // 2, n),
                     )
-
                 def forward(self, feat_tensor):
                     return F.softmax(self.net(feat_tensor), dim=1)
 
-            gate = Gate(gate_input_dim, h, n_experts).to(self._device)
-            gate_path = weights_dir / "gate_best.pth"
+            gate = Gate(in_dim, h, n_experts).to(self._device)
 
-            if gate_path.exists():
-                try:
-                    gckpt = torch.load(gate_path, map_location=self._device)
-                    gate.load_state_dict(gckpt.get("gate_state", gckpt))
-                    logger.info("Gate loaded from %s", gate_path)
-                except RuntimeError as e:
-                    err = str(e)
-                    if "size mismatch" in err:
-                        match = re.search(r"torch\.Size\(\[256, (\d+)\]\)", err)
-                        if match:
-                            ckpt_dim = int(match.group(1))
-                            gate_proj = nn.Linear(in_dim, ckpt_dim).to(self._device)
-                            gate = Gate(ckpt_dim, h, n_experts).to(self._device)
-                            try:
-                                gate.load_state_dict(gckpt.get("gate_state", gckpt))
-                                logger.info(
-                                    "Gate loaded with projection %d→%d",
-                                    in_dim,
-                                    ckpt_dim,
-                                )
-                            except RuntimeError as e2:
-                                logger.warning("Gate still failed: %s", e2)
-                        else:
-                            logger.warning("Gate mismatch, uniform weights: %s", e)
-                    else:
-                        logger.warning("Gate load error, uniform weights: %s", e)
-            else:
-                logger.warning("Gate weights missing — uniform weighting")
+            # Download and load gate weights
+            try:
+                gate_path = hf_hub_download(
+                    repo_id=self._hf_repo_id,
+                    filename="gate_best.pth",
+                    cache_dir="/tmp/hf_cache"
+                )
+                gckpt = torch.load(gate_path, map_location=self._device)
+                gate.load_state_dict(gckpt.get("gate_state", gckpt))
+                logger.info("Gate loaded from HF")
+            except Exception as e:
+                logger.warning("Gate load failed: %s — using uniform weights", e)
 
             gate.eval()
-            if gate_proj is not None:
-                gate_proj.eval()
 
-            # ── Assemble MoE ──────────────────────────────────────────────────
+            # ---- 6. Assemble MoE ----------------------------------------------
+            extractors = [ExpertExtractor(expert_models[n], n) for n in builders]
             class _MoE(nn.Module):
-                def __init__(self, extractors, gate, gate_proj=None):
+                def __init__(self, extractors, gate):
                     super().__init__()
                     self.extractors = nn.ModuleList(extractors)
                     self.gate = gate
-                    self.gate_proj = gate_proj
-
                 def forward(self, x):
                     feats, logits = [], []
                     for e in self.extractors:
@@ -281,27 +246,25 @@ class MoEPredictor(BasePredictor):
                         feats.append(f)
                         logits.append(l)
                     combined = torch.cat(feats, dim=1)
-                    if self.gate_proj is not None:
-                        combined = self.gate_proj(combined)
                     gw = self.gate(combined)
                     stacked = torch.stack(logits, dim=1)
                     fused = (gw.unsqueeze(-1) * stacked).sum(dim=1)
                     return fused, gw, logits
 
-            extractors = [ExpertExtractor(expert_models[n], n) for n in builders]
-            self._moe = _MoE(extractors, gate, gate_proj).to(self._device)
+            self._moe = _MoE(extractors, gate).to(self._device)
             self._moe.eval()
             self._expert_names = list(builders.keys())
             self._loaded = True
-            logger.info("MoE assembled: %d experts on %s", n_experts, self._device)
+            logger.info("MoE assembled from Hugging Face: %d experts on %s", n_experts, self._device)
 
         except ImportError as e:
             logger.error("Missing dependency for MoEPredictor: %s", e)
         except Exception as e:
             logger.error("MoEPredictor load failed: %s", e, exc_info=True)
 
-    # ─── predict ─────────────────────────────────────────────────────────────
-
+    # ------------------------------------------------------------------
+    # predict – unchanged (same as original)
+    # ------------------------------------------------------------------
     def predict(self, image: Any) -> PredictionResult:
         if not self._loaded or self._moe is None:
             raise InferenceError("MoE weights not loaded.")
@@ -309,78 +272,56 @@ class MoEPredictor(BasePredictor):
         import torch
         import torch.nn.functional as F
         import numpy as np
+        from PIL import Image
 
         try:
-            # ── Preprocess ───────────────────────────────────────────────────
             if hasattr(image, "convert"):
                 pil = image.convert("RGB")
-                arr = (
-                    np.array(pil.resize((_IMG_SIZE, _IMG_SIZE))).astype(np.float32)
-                    / 255.0
-                )
-                arr = (arr - np.array([0.485, 0.456, 0.406])) / np.array(
-                    [0.229, 0.224, 0.225]
-                )
-                tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0).float()
+                arr = (np.array(pil.resize((_IMG_SIZE, _IMG_SIZE))).astype(np.float32) / 255.0)
+                arr = (arr - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+                tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0).float().to(self._device)
             else:
-                tensor = image
-                pil = None  # tensor input — Grad-CAM still possible
+                tensor = image.to(self._device)
+                pil = None
 
-            tensor = tensor.to(self._device)
-
-            # ── Forward pass (no_grad for logits) ────────────────────────────
             with torch.no_grad():
                 fused, gate_w, expert_logits = self._moe(tensor)
 
             probs = F.softmax(fused, dim=1)[0]
             pred_idx = int(probs.argmax())
             confidence = float(probs[pred_idx])
-
             predicted_class = CLASS_NAMES[pred_idx]
             criticality = CRITICALITY_MAP.get(predicted_class, "UNKNOWN")
             gate_weights = gate_w[0].cpu().tolist()
-            class_probabilities = {
-                CLASS_NAMES[i]: float(probs[i]) for i in range(len(CLASS_NAMES))
-            }
+            class_probabilities = {CLASS_NAMES[i]: float(probs[i]) for i in range(len(CLASS_NAMES))}
 
-            # ── Per-expert breakdown ──────────────────────────────────────────
             per_expert = []
             for i, (name, logits) in enumerate(zip(self._expert_names, expert_logits)):
                 ep = F.softmax(logits, dim=1)[0]
-                conf = float(ep.max())
-                per_expert.append(
-                    {
-                        "expert": name,
-                        "class": CLASS_NAMES[int(ep.argmax())],
-                        "confidence": conf,
-                        "gate_weight": gate_weights[i],
-                    }
-                )
+                per_expert.append({
+                    "expert": name,
+                    "class": CLASS_NAMES[int(ep.argmax())],
+                    "confidence": float(ep.max()),
+                    "gate_weight": gate_weights[i],
+                })
 
-            # Determine top expert based on the highest gate weight
             top_expert_idx = int(np.argmax(gate_weights))
-
-            # ── Grad-CAM ─────────────────────────────────────────────────────
             heatmap_np = self._compute_gradcam(
-                tensor,
-                pred_idx,
+                tensor, pred_idx,
                 self._moe.extractors[top_expert_idx].model,
-                self._expert_names[top_expert_idx],
+                self._expert_names[top_expert_idx]
             )
 
-            # ── Heatmap overlay visualization ─────────────────────────────────
-            from PIL import Image
             source_pil = pil if pil is not None else _tensor_to_pil(tensor)
             orig_np = np.array(source_pil.convert("RGB").resize((_IMG_SIZE, _IMG_SIZE)))
             heat_np = _heatmap_overlay(orig_np, heatmap_np)
-            
-            # Optionally draw damage boxes if criticality is not STABLE
+
             if criticality != "STABLE":
                 boxes = _damage_boxes(heatmap_np, threshold=0.50)
                 if boxes:
                     crit_rgb = _CRIT_COLOUR.get(criticality, _CRIT_COLOUR["UNKNOWN"])
                     heat_np = _draw_boxes_pil(heat_np.copy(), boxes, colour=crit_rgb)
-            
+
             heatmap_pil = Image.fromarray(heat_np)
 
             result = PredictionResult(
@@ -389,7 +330,6 @@ class MoEPredictor(BasePredictor):
                 class_probabilities=class_probabilities,
                 gradcam_image=heatmap_pil,
             )
-            # MoE-specific extras surfaced by PredictionService
             result.gate_weights = gate_weights
             result.per_expert = per_expert
             result.criticality = criticality
@@ -397,8 +337,6 @@ class MoEPredictor(BasePredictor):
             result.expert_names = self._expert_names
             return result
 
-        except InferenceError:
-            raise
         except Exception as e:
             logger.error("MoE inference error: %s", e, exc_info=True)
             raise InferenceError(f"MoE prediction failed: {e}")
