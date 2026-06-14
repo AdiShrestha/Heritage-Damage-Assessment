@@ -44,14 +44,14 @@ export function Navbar() {
     }`;
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5">
-      <div className="mx-auto flex max-w-[1280px] items-center justify-between rounded-[22px] border border-[#d7c3b1] bg-[#fffaf3]/90 px-4 py-3 text-[#251c19] shadow-lg shadow-[#5f321d]/10 backdrop-blur-xl sm:px-5">
-        <NavLink to="/" className="flex items-center gap-3 group">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#a4432d] text-[#fff8ee] transition-colors duration-200 group-hover:bg-[#251c19]">
+    <header className="fixed inset-x-0 top-0 z-50 bg-[#1C1816] text-white shadow-lg print:hidden">
+      <div className="mx-auto flex max-w-[1100px] items-center justify-between px-4 py-3 sm:px-6">
+        <NavLink to="/" className="flex items-center gap-2 group mr-4">
+          <div className="text-[#D4A04A] transition-colors duration-200 group-hover:text-[#E8C47A]">
             <PagodaIcon />
           </div>
-          <div>
-            <div className="font-display text-lg font-semibold tracking-tight text-[#251c19]">
+          <div className="hidden sm:block">
+            <div className="font-display text-sm md:text-base font-semibold tracking-tight text-[#F5F0EB]">
               Heritage Assessment
             </div>
             <div className="text-xs text-[#8b6e61] font-display italic">
@@ -63,6 +63,18 @@ export function Navbar() {
         <nav className="hidden items-center gap-1 rounded-xl border border-[#e3d4c6] bg-white/65 p-1 md:flex">
           <NavLink to="/" end className={navClass}>
             Assess
+          </NavLink>
+          <NavLink to="/batch" className={navClass}>
+            Batch
+          </NavLink>
+          <NavLink to="/compare" className={navClass}>
+            Compare
+          </NavLink>
+          <NavLink to="/uncertainty" className={navClass}>
+            Uncertainty
+          </NavLink>
+          <NavLink to="/dashboard" className={navClass}>
+            Dashboard
           </NavLink>
           <NavLink to="/models" className={navClass}>
             Models
@@ -92,7 +104,7 @@ export function Navbar() {
             className="inline-flex items-center justify-center rounded-lg border border-[#dfcfc0] bg-white/70 p-2 text-[#65554d] transition-colors duration-150 ease-in-out hover:text-[#a4432d] md:hidden"
             aria-label="Open navigation menu"
           >
-            <Menu className="h-5 w-5" />
+            <Menu className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -102,6 +114,18 @@ export function Navbar() {
           <div className="flex flex-col gap-2">
             <NavLink to="/" end className={navClass}>
               Assess
+            </NavLink>
+            <NavLink to="/batch" className={navClass}>
+              Batch
+            </NavLink>
+            <NavLink to="/compare" className={navClass}>
+              Compare
+            </NavLink>
+            <NavLink to="/uncertainty" className={navClass}>
+              Uncertainty
+            </NavLink>
+            <NavLink to="/dashboard" className={navClass}>
+              Dashboard
             </NavLink>
             <NavLink to="/models" className={navClass}>
               Models

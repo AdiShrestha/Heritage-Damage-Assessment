@@ -40,7 +40,7 @@ export function ResultCard({ result, originalSrc }) {
         <div className="pagoda-divider-dot" />
       </div>
 
-      <GradCamViewer originalSrc={originalSrc} gradcamBase64={result.gradcam_image_base64} />
+      <GradCamViewer originalSrc={originalSrc} gradcamBase64={result.gradcam_image_base64} modelUsed={result.model_used} />
 
       <div className="mt-5 flex flex-col gap-2 border-t border-[#e2d0c0] pt-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs font-mono text-[#796a62]">Request ID: {result.request_id}</p>

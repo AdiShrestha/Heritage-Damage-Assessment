@@ -11,6 +11,7 @@ import {
   ShieldX,
   Sparkles,
   X,
+  FileText,
 } from "lucide-react";
 import { usePrediction } from "../hooks/usePrediction";
 import { useModels } from "../hooks/useModels";
@@ -19,6 +20,7 @@ import { ModelSelector } from "../components/assessment/ModelSelector";
 import { ResultCard } from "../components/assessment/ResultCard";
 import { ErrorAlert } from "../components/common/ErrorAlert";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
+import { ReportViewer } from "../components/assessment/ReportViewer";
 import { formatFileSize } from "../utils/image";
 
 function MiniTempleIcon({ className = "" }) {
@@ -58,221 +60,6 @@ function MiniTempleIcon({ className = "" }) {
   );
 }
 
-// function StupaLineArt() {
-//   return (
-//     <svg viewBox="0 0 320 360" fill="none" aria-hidden="true" className="h-full w-full">
-//       <path d="M35 286h250M52 262h216M70 241h180" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-//       <path d="M80 239c0-67 36-113 80-113s80 46 80 113" stroke="currentColor" strokeWidth="4" />
-//       <path d="M118 221c7-33 22-52 42-52s35 19 42 52" stroke="currentColor" strokeWidth="2" opacity="0.45" />
-//       <path d="M125 115h70v31h-70V115Z" stroke="currentColor" strokeWidth="4" />
-//       <path d="M160 115V41" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-//       <path d="M160 38l-9-15 9-16 9 16-9 15Z" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
-//       <path d="M126 188c15-12 31-12 48 0M146 189c-8 13-18 13-30 1M194 189c8 13 18 13 30 1" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-//       <path d="M110 177c15-12 32-12 48 0M210 177c-15-12-32-12-48 0M156 202h8l-4 13-4-13Z" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
-//       <path d="M124 96c21 10 51 10 72 0M132 79c18 8 38 8 56 0M140 64c13 5 27 5 40 0" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.75" />
-//       <path d="M61 308h198M83 329h154" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-//       <path d="M43 286c13 19 29 29 49 30M277 286c-13 19-29 29-49 30" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.55" />
-//     </svg>
-//   );
-// }
-
-// function StupaLineArt() {
-//   return (
-//     <svg
-//       viewBox="0 0 640 400"
-//       fill="none"
-//       aria-hidden="true"
-//       className="h-full w-full"
-//     >
-//       {/* Radiating prayer-flag lines from spire tip */}
-//       <g
-//         stroke="currentColor"
-//         strokeWidth="1.2"
-//         opacity="0.45"
-//         strokeLinecap="round"
-//       >
-//         <path d="M320 40L40 165" />
-//         <path d="M320 40L70 195" />
-//         <path d="M320 40L110 218" />
-//         <path d="M320 40L160 236" />
-//         <path d="M320 40L600 165" />
-//         <path d="M320 40L570 195" />
-//         <path d="M320 40L530 218" />
-//         <path d="M320 40L480 236" />
-//       </g>
-//       {/* Beaded prayer flag dots */}
-//       <g fill="currentColor" opacity="0.55">
-//         {[0.22, 0.4, 0.58, 0.76, 0.92].map((t, i) => {
-//           const x = 320 + (40 - 320) * t;
-//           const y = 40 + (165 - 40) * t;
-//           return <circle key={`l1-${i}`} cx={x} cy={y} r="2" />;
-//         })}
-//         {[0.22, 0.4, 0.58, 0.76, 0.92].map((t, i) => {
-//           const x = 320 + (110 - 320) * t;
-//           const y = 40 + (218 - 40) * t;
-//           return <circle key={`l2-${i}`} cx={x} cy={y} r="2" />;
-//         })}
-//         {[0.22, 0.4, 0.58, 0.76, 0.92].map((t, i) => {
-//           const x = 320 + (600 - 320) * t;
-//           const y = 40 + (165 - 40) * t;
-//           return <circle key={`r1-${i}`} cx={x} cy={y} r="2" />;
-//         })}
-//         {[0.22, 0.4, 0.58, 0.76, 0.92].map((t, i) => {
-//           const x = 320 + (530 - 320) * t;
-//           const y = 40 + (218 - 40) * t;
-//           return <circle key={`r2-${i}`} cx={x} cy={y} r="2" />;
-//         })}
-//       </g>
-
-//       {/* Spire / finial */}
-//       <path
-//         d="M320 38 L313 88 L327 88 Z"
-//         stroke="currentColor"
-//         strokeWidth="2"
-//         strokeLinejoin="round"
-//         fill="none"
-//       />
-//       <path
-//         d="M311 90c0 10 18 10 18 0"
-//         stroke="currentColor"
-//         strokeWidth="1.6"
-//         fill="none"
-//       />
-//       <path
-//         d="M308 96h24v8h-24z"
-//         stroke="currentColor"
-//         strokeWidth="1.8"
-//         fill="none"
-//       />
-//       <path
-//         d="M304 106c0 4 32 4 32 0"
-//         stroke="currentColor"
-//         strokeWidth="1.6"
-//         fill="none"
-//       />
-
-//       {/* Harmika tower segments */}
-//       <path
-//         d="M298 114h44v40h-44z"
-//         stroke="currentColor"
-//         strokeWidth="2"
-//         fill="none"
-//       />
-//       <path
-//         d="M298 134h44"
-//         stroke="currentColor"
-//         strokeWidth="1"
-//         opacity="0.5"
-//       />
-//       <path
-//         d="M292 154l8 8h40l8-8"
-//         stroke="currentColor"
-//         strokeWidth="1.8"
-//         fill="none"
-//       />
-
-//       {/* Buddha eyes on harmika */}
-//       <g
-//         stroke="currentColor"
-//         strokeWidth="1.8"
-//         strokeLinecap="round"
-//         fill="none"
-//       >
-//         <path d="M306 124c4-6 10-6 14 0" />
-//         <path d="M334 124c4-6 10-6 14 0" />
-//         <circle cx="313" cy="125" r="1.6" fill="currentColor" stroke="none" />
-//         <circle cx="341" cy="125" r="1.6" fill="currentColor" stroke="none" />
-//         <path d="M325 130l2.5 5h-5z" />
-//       </g>
-
-//       {/* Dome (anda) — bell-shaped */}
-//       <path
-//         d="M175 270c-8-78 50-148 145-148s153 70 145 148"
-//         stroke="currentColor"
-//         strokeWidth="2.4"
-//         fill="none"
-//       />
-//       {/* Dome hatch shading - left */}
-//       <g stroke="currentColor" strokeWidth="1" opacity="0.4">
-//         <path d="M198 262c0-58 48-112 110-126" />
-//         <path d="M215 266c2-50 45-98 100-112" />
-//         <path d="M233 270c4-42 42-84 90-98" />
-//         <path d="M251 273c7-34 38-70 80-84" />
-//         <path d="M269 276c10-26 33-56 68-70" />
-//         <path d="M287 278c12-20 28-44 56-58" />
-//       </g>
-//       {/* Dome hatch shading - right */}
-//       <g stroke="currentColor" strokeWidth="1" opacity="0.35">
-//         <path d="M442 262c0-58-48-112-110-126" />
-//         <path d="M425 266c-2-50-45-98-100-112" />
-//         <path d="M407 270c-4-42-42-84-90-98" />
-//         <path d="M389 273c-7-34-38-70-80-84" />
-//         <path d="M371 276c-10-26-33-56-68-70" />
-//         <path d="M353 278c-12-20-28-44-56-58" />
-//       </g>
-
-//       {/* Eyes-of-Buddha lower band */}
-//       <path
-//         d="M180 270h280"
-//         stroke="currentColor"
-//         strokeWidth="2.4"
-//         strokeLinecap="round"
-//       />
-//       <g fill="currentColor" opacity="0.5">
-//         {Array.from({ length: 26 }).map((_, i) => (
-//           <circle key={i} cx={190 + i * 10.5} cy={278} r="1.4" />
-//         ))}
-//       </g>
-
-//       {/* Base plinth tiers */}
-//       <path
-//         d="M150 286h340v14H150z"
-//         stroke="currentColor"
-//         strokeWidth="2"
-//         fill="none"
-//       />
-//       <path
-//         d="M125 312h390v16H125z"
-//         stroke="currentColor"
-//         strokeWidth="2"
-//         fill="none"
-//       />
-//       <path
-//         d="M95 340h450v18H95z"
-//         stroke="currentColor"
-//         strokeWidth="2"
-//         fill="none"
-//       />
-
-//       {/* Step lines / niche marks */}
-//       <g stroke="currentColor" strokeWidth="1.2" opacity="0.45">
-//         <path d="M150 293h340" />
-//         <path d="M125 320h390" />
-//         <path d="M95 349h450" />
-//         {[170, 230, 290, 350, 410, 470].map((x) => (
-//           <path key={x} d={`M${x} 286v14`} />
-//         ))}
-//       </g>
-
-//       {/* Flanking small chaityas */}
-//       <g stroke="currentColor" strokeWidth="1.8" opacity="0.7" fill="none">
-//         <path d="M48 326c0-14 10-22 22-22s22 8 22 22" />
-//         <path d="M50 326h40v20H50z" />
-//         <path d="M548 326c0-14 10-22 22-22s22 8 22 22" />
-//         <path d="M550 326h40v20H550z" />
-//       </g>
-
-//       {/* Ground line */}
-//       <path
-//         d="M30 360h580"
-//         stroke="currentColor"
-//         strokeWidth="2"
-//         strokeLinecap="round"
-//         opacity="0.55"
-//       />
-//     </svg>
-//   );
-// }
 function StupaLineArt() {
   return (
     <svg
@@ -511,11 +298,22 @@ export default function AssessPage() {
     selectedFile,
     previewURL,
     selectedModel,
+    isReportMode,
+    siteId,
+    siteName,
+    surveyor,
+    notes,
     setFile,
     setModel,
+    setIsReportMode,
+    setSiteId,
+    setSiteName,
+    setSurveyor,
+    setNotes,
     run,
     reset,
   } = usePrediction();
+
   const [previewLabel, setPreviewLabel] = useState(null);
 
   function handleFile(file) {
@@ -650,54 +448,134 @@ export default function AssessPage() {
               ) : null}
             </div>
 
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
-              <RiskCurve score={confidenceScore} />
+            {/* Report Options Card */}
+            <section className="heritage-card p-5 space-y-4">
+              <h2 className="text-sm font-semibold tracking-tight text-text">
+                <span className="heritage-ornament">Assessment Options</span>
+              </h2>
 
-              <section className="scan-card flex flex-col justify-between p-5">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9b6b57]">
-                    Action
-                  </p>
-                  <h2 className="mt-2 font-display text-xl font-semibold text-[#251c19]">
-                    Run Inference
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-[#796a62]">
-                    {selectedFile
-                      ? "Prepared for model analysis."
-                      : "Choose a structure image to begin."}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={run}
-                  disabled={!selectedFile || status === "loading"}
-                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#251c19] px-4 py-3 text-sm font-semibold text-white shadow-sm transition duration-300 hover:-translate-y-0.5 hover:bg-[#a4432d] disabled:cursor-not-allowed disabled:bg-[#cfc0b3] disabled:hover:translate-y-0"
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  id="isReportMode"
+                  type="checkbox"
+                  checked={isReportMode}
+                  onChange={(e) => setIsReportMode(e.target.checked)}
+                  className="h-4 w-4 rounded border-stone-custom-light text-[#A63A2A] focus:ring-[#A63A2A]/20"
+                  disabled={status === "loading"}
+                />
+                <label
+                  htmlFor="isReportMode"
+                  className="text-xs font-semibold text-text flex items-center gap-1.5 cursor-pointer"
                 >
-                  {status === "loading" ? (
-                    <>
-                      <LoadingSpinner size="sm" />
-                      Analysing
-                    </>
-                  ) : (
-                    <>
-                      <ScanLine className="h-4 w-4" />
-                      Assess Damage
-                    </>
-                  )}
-                </button>
+                  <FileText className="h-3.5 w-3.5 text-[#A63A2A]" />
+                  Generate Structured Report
+                </label>
+              </div>
 
-                {status === "error" && error ? (
-                  <div className="mt-4">
-                    <ErrorAlert
-                      title="Assessment Failed"
-                      message={error.message}
-                      onRetry={run}
+              {isReportMode && (
+                <div className="mt-3 space-y-3 border-t border-stone-custom-light pt-3 text-xs fade-in">
+                  <div>
+                    <label
+                      htmlFor="siteId"
+                      className="block font-medium text-text-muted mb-1"
+                    >
+                      Site ID
+                    </label>
+                    <input
+                      id="siteId"
+                      type="text"
+                      value={siteId}
+                      onChange={(e) => setSiteId(e.target.value)}
+                      placeholder="e.g. patan_durbar_01"
+                      className="w-full rounded-lg border border-stone-custom-light bg-bg px-3 py-2 text-xs text-text placeholder-text-muted focus:border-primary focus:outline-none"
+                      disabled={status === "loading"}
                     />
                   </div>
-                ) : null}
-              </section>
-            </div>
+                  <div>
+                    <label
+                      htmlFor="siteName"
+                      className="block font-medium text-text-muted mb-1"
+                    >
+                      Site Name
+                    </label>
+                    <input
+                      id="siteName"
+                      type="text"
+                      value={siteName}
+                      onChange={(e) => setSiteName(e.target.value)}
+                      placeholder="e.g. Patan Durbar Square"
+                      className="w-full rounded-lg border border-stone-custom-light bg-bg px-3 py-2 text-xs text-text placeholder-text-muted focus:border-primary focus:outline-none"
+                      disabled={status === "loading"}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="surveyor"
+                      className="block font-medium text-text-muted mb-1"
+                    >
+                      Surveyor Name
+                    </label>
+                    <input
+                      id="surveyor"
+                      type="text"
+                      value={surveyor}
+                      onChange={(e) => setSurveyor(e.target.value)}
+                      placeholder="e.g. Ar. Rajesh Shrestha"
+                      className="w-full rounded-lg border border-stone-custom-light bg-bg px-3 py-2 text-xs text-text placeholder-text-muted focus:border-primary focus:outline-none"
+                      disabled={status === "loading"}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="notes"
+                      className="block font-medium text-text-muted mb-1"
+                    >
+                      Field Notes
+                    </label>
+                    <textarea
+                      id="notes"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Describe cracks, weathering, or stability concerns..."
+                      rows="3"
+                      className="w-full rounded-lg border border-stone-custom-light bg-bg px-3 py-2 text-xs text-text placeholder-text-muted focus:border-primary focus:outline-none"
+                      disabled={status === "loading"}
+                    />
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* Trigger Card */}
+            <section className="heritage-card p-5">
+              <button
+                type="button"
+                onClick={run}
+                disabled={!selectedFile || status === "loading"}
+                className="flex w-full items-center justify-center rounded-lg bg-gradient-to-r from-[#A63A2A] to-[#C54F3A] px-4 py-3 text-sm font-medium text-white shadow-sm transition-all duration-150 ease-in-out hover:from-[#8B2A1A] hover:to-[#A63A2A] disabled:cursor-not-allowed disabled:from-stone-custom-light disabled:to-stone-custom-light disabled:opacity-60"
+              >
+                {status === "loading" ? (
+                  <span className="flex items-center gap-2">
+                    <LoadingSpinner size="sm" />
+                    {isReportMode ? "Generating Report..." : "Analysing..."}
+                  </span>
+                ) : isReportMode ? (
+                  "Generate Survey Report"
+                ) : (
+                  "Run Assessment"
+                )}
+              </button>
+
+              {status === "error" && error ? (
+                <div className="mt-4">
+                  <ErrorAlert
+                    title="Assessment Failed"
+                    message={error.message}
+                    onRetry={run}
+                  />
+                </div>
+              ) : null}
+            </section>
           </section>
 
           <aside className="heritage-showcase relative overflow-hidden rounded-[28px] bg-[#211d1c] p-5 text-[#fff8ee] shadow-xl lg:min-h-[560px]">
@@ -783,7 +661,11 @@ export default function AssessPage() {
             </div>
           </div>
         ) : result ? (
-          <ResultCard result={result} originalSrc={previewURL} />
+          isReportMode ? (
+            <ReportViewer report={result} />
+          ) : (
+            <ResultCard result={result} originalSrc={previewURL} />
+          )
         ) : null}
       </section>
     </div>

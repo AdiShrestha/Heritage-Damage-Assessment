@@ -1,84 +1,179 @@
 from __future__ import annotations
 
-"""EfficientNet predictor skeleton."""
+"""EfficientNet-B4 predictor — full inference, correct checkpoint loading."""
 
 from pathlib import Path
 from typing import Any
 
-from app.ml.base_predictor import BasePredictor
+from app.ml.base_predictor import BasePredictor, PredictionResult
+from app.core.exceptions import InferenceError
 from app.core.logging import get_logger
-from app.utils.constants import NUM_CLASSES
-from app.ml.base_predictor import PredictionResult
-from app.utils.constants import CLASS_NAMES
+from app.utils.constants import CLASS_NAMES, NUM_CLASSES
 
 logger = get_logger(__name__)
 
 
 class EfficientNetPredictor(BasePredictor):
-    """EfficientNetB4 predictor skeleton."""
-
     def __init__(self) -> None:
         self._model = None
         self._loaded = False
         self._device = "cpu"
+        self._epoch: int | None = None
 
     def load_model(self, weights_path: Path | None = None) -> None:
         try:
             import torch
+            import torch.nn as nn
             import torchvision.models as models
 
             self._device = "cuda" if torch.cuda.is_available() else "cpu"
+
             if weights_path is None or not weights_path.exists():
                 logger.warning(
-                    "EfficientNet weights not found at %s. Predictor inactive.",
-                    weights_path,
+                    "EfficientNet weights not found at %s — inactive.", weights_path
                 )
                 return
+
             model = models.efficientnet_b4(weights=None)
-            in_features = model.classifier[1].in_features
-            model.classifier = torch.nn.Sequential(
-                torch.nn.Dropout(0.4),
-                torch.nn.Linear(in_features, NUM_CLASSES),
+            in_feats = model.classifier[1].in_features
+            model.classifier = nn.Sequential(
+                nn.Dropout(0.4),
+                nn.Linear(in_feats, 512),
+                nn.ReLU(inplace=True),
+                nn.Dropout(0.3),
+                nn.Linear(512, NUM_CLASSES),
             )
-            model.load_state_dict(torch.load(weights_path, map_location=self._device))
+
+            # ── Extract model_state from checkpoint wrapper ───────────────────
+            # Checkpoint format: {"model_state": …, "ema_state": …, "epoch": …}
+            # DO NOT pass the whole dict to load_state_dict.
+            ckpt = torch.load(weights_path, map_location=self._device)
+            state = ckpt.get("model_state", ckpt)  # fall back if plain state dict
+            model.load_state_dict(state, strict=True)
+            self._epoch = int(ckpt.get("epoch", -1)) + 1
             model.eval()
+
             self._model = model.to(self._device)
             self._loaded = True
             logger.info(
-                "EfficientNetB4 loaded from %s on %s", weights_path, self._device
+                "EfficientNet-B4 loaded from %s on %s", weights_path, self._device
             )
-        except ImportError:
-            logger.error("PyTorch not installed. EfficientNetPredictor unavailable.")
-        except Exception as e:
-            logger.error("Failed to load EfficientNetB4: %s", str(e))
 
-    # Replace predict():
+        except Exception as exc:
+            logger.error("EfficientNet load FAILED: %s", exc, exc_info=True)
+            self._loaded = False
+            self._model = None
+
     def predict(self, image: Any) -> PredictionResult:
-        if not self._loaded:
-            raise RuntimeError("EfficientNet weights not loaded.")
-        import torch, numpy as np
+        if not self._loaded or self._model is None:
+            raise InferenceError("EfficientNet weights not loaded.")
+
+        import numpy as np
+        import torch
+        from PIL import Image
 
         if hasattr(image, "convert"):
-            pil = image.convert("RGB").resize((224, 224))
+            pil = image.convert("RGB").resize((224, 224), Image.Resampling.LANCZOS)
             arr = np.array(pil).astype(np.float32) / 255.0
-            arr = (arr - np.array([0.485, 0.456, 0.406])) / np.array(
-                [0.229, 0.224, 0.225]
+            mean = np.array([0.485, 0.456, 0.406])
+            std = np.array([0.229, 0.224, 0.225])
+            tensor = (
+                torch.from_numpy(((arr - mean) / std).transpose(2, 0, 1))
+                .unsqueeze(0)
+                .float()
+                .to(self._device)
             )
-            tensor = torch.from_numpy(arr.transpose(2, 0, 1)).unsqueeze(0).float()
         else:
-            tensor = image
+            tensor = image.to(self._device)
 
-        tensor = tensor.to(self._device)
+        self._model.eval()
         with torch.no_grad():
             logits = self._model(tensor)
+
         probs = torch.softmax(logits[0], dim=0).cpu().numpy()
         pred_idx = int(probs.argmax())
+
+        gradcam_image = None
+        try:
+            gradcam_image = self._gradcam(
+                tensor, image if hasattr(image, "convert") else None
+            )
+        except Exception as e:
+            logger.debug("EfficientNet Grad-CAM skipped: %s", e)
+
         return PredictionResult(
             predicted_class=CLASS_NAMES[pred_idx],
             confidence=float(probs[pred_idx]),
             class_probabilities={CLASS_NAMES[i]: float(p) for i, p in enumerate(probs)},
-            gradcam_image=None,
+            gradcam_image=gradcam_image,
         )
+
+    def _gradcam(self, tensor, original_pil):
+        import torch
+        import torch.nn.functional as F
+        import numpy as np
+        from PIL import Image
+
+        # EfficientNet: features[-1] is a Sequential wrapper.
+        # Walk into it to find the last Conv2d for spatial activations.
+        import torch.nn as nn
+        target = self._model.features[-1]
+        # Drill down to the actual conv submodule so hooks capture 4-D tensors
+        conv_layers = [m for m in target.modules() if isinstance(m, nn.Conv2d)]
+        if conv_layers:
+            target = conv_layers[-1]
+        activations = []
+        gradients = []
+
+        h_fwd = target.register_forward_hook(
+            lambda _, __, out: activations.append(out.detach().clone())
+        )
+        h_bwd = target.register_full_backward_hook(
+            lambda _, __, g: gradients.append(g[0].detach().clone())
+        )
+
+        try:
+            inp = tensor.detach().clone().requires_grad_(True)
+            with torch.enable_grad():
+                out = self._model(inp)
+                score = out[0, out[0].argmax()]
+                self._model.zero_grad()
+                score.backward()
+        finally:
+            h_fwd.remove()
+            h_bwd.remove()
+
+        if not activations or not gradients:
+            return None
+
+        act = activations[0].squeeze(0)
+        grad = gradients[0].squeeze(0)
+        cam = F.relu((grad.mean(dim=[1, 2], keepdim=True) * act).sum(dim=0))
+        cam = (
+            F.interpolate(
+                cam.unsqueeze(0).unsqueeze(0).float(),
+                size=(224, 224),
+                mode="bilinear",
+                align_corners=False,
+            )
+            .squeeze()
+            .cpu()
+            .numpy()
+        )
+        cam = (cam - cam.min()) / (cam.max() - cam.min() + 1e-7)
+
+        if original_pil is None:
+            return None
+        orig = (
+            np.array(original_pil.convert("RGB").resize((224, 224))).astype(np.float32)
+            / 255.0
+        )
+        r = np.clip(1.5 - np.abs(4.0 * cam - 3.0), 0, 1)
+        g = np.clip(1.5 - np.abs(4.0 * cam - 2.0), 0, 1)
+        b = np.clip(1.5 - np.abs(4.0 * cam - 1.0), 0, 1)
+        jet = np.stack([r, g, b], axis=-1)
+        blend = np.clip(0.55 * orig + 0.45 * jet, 0, 1)
+        return Image.fromarray((blend * 255).astype(np.uint8))
 
     def is_loaded(self) -> bool:
         return self._loaded
@@ -89,4 +184,6 @@ class EfficientNetPredictor(BasePredictor):
 
     @property
     def model_version(self) -> str:
-        return "1.0.0"
+        if self._loaded and self._epoch is not None:
+            return f"epoch-{self._epoch}"
+        return "1.0.0" if self._loaded else "not-loaded"

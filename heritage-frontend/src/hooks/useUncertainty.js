@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
-import { predict } from '../api/predict';
-import { generateReport } from '../api/report';
+import { estimateUncertainty } from '../api/uncertainty';
 import { createPreviewURL, revokePreviewURL, validateFile } from '../utils/image';
 
 const initialState = {
@@ -10,26 +9,16 @@ const initialState = {
   error: null,
   selectedFile: null,
   previewURL: null,
-  selectedModel: 'moe', // Set to Mixture of Experts by default since it has the most features!
-  isReportMode: false,
-  siteId: '',
-  siteName: '',
-  surveyor: '',
-  notes: '',
+  passes: 15,
 };
 
-export function usePrediction() {
+export function useUncertainty() {
   const [status, setStatus] = useState(initialState.status);
   const [result, setResult] = useState(initialState.result);
   const [error, setError] = useState(initialState.error);
   const [selectedFile, setSelectedFile] = useState(initialState.selectedFile);
   const [previewURL, setPreviewURL] = useState(initialState.previewURL);
-  const [selectedModel, setSelectedModel] = useState(initialState.selectedModel);
-  const [isReportMode, setIsReportMode] = useState(initialState.isReportMode);
-  const [siteId, setSiteId] = useState(initialState.siteId);
-  const [siteName, setSiteName] = useState(initialState.siteName);
-  const [surveyor, setSurveyor] = useState(initialState.surveyor);
-  const [notes, setNotes] = useState(initialState.notes);
+  const [passes, setPasses] = useState(initialState.passes);
   const previewRef = useRef(null);
 
   useEffect(() => {
@@ -61,39 +50,21 @@ export function usePrediction() {
     setError(null);
   }
 
-  function setModel(name) {
-    setSelectedModel(name);
-  }
-
   async function run() {
-    if (!selectedFile) {
-      return;
-    }
+    if (!selectedFile) return;
 
     setStatus('loading');
     setError(null);
 
     try {
-      let response;
-      if (isReportMode) {
-        response = await generateReport(
-          selectedFile,
-          selectedModel,
-          siteId || null,
-          siteName || null,
-          surveyor || null,
-          notes || null
-        );
-      } else {
-        response = await predict(selectedFile, selectedModel);
-      }
+      const response = await estimateUncertainty(selectedFile, passes);
       setResult(response);
       setStatus('success');
-      toast.success(isReportMode ? 'Report generated' : 'Assessment complete');
+      toast.success('Uncertainty analysis complete');
     } catch (normalizedError) {
       setError(normalizedError);
       setStatus('error');
-      toast.error(normalizedError.message || 'Action failed');
+      toast.error(normalizedError.message || 'Analysis failed.');
     }
   }
 
@@ -108,12 +79,7 @@ export function usePrediction() {
     setError(initialState.error);
     setSelectedFile(initialState.selectedFile);
     setPreviewURL(initialState.previewURL);
-    setSelectedModel(initialState.selectedModel);
-    setIsReportMode(initialState.isReportMode);
-    setSiteId(initialState.siteId);
-    setSiteName(initialState.siteName);
-    setSurveyor(initialState.surveyor);
-    setNotes(initialState.notes);
+    setPasses(initialState.passes);
   }
 
   return {
@@ -122,19 +88,9 @@ export function usePrediction() {
     error,
     selectedFile,
     previewURL,
-    selectedModel,
-    isReportMode,
-    siteId,
-    siteName,
-    surveyor,
-    notes,
+    passes,
     setFile,
-    setModel,
-    setIsReportMode,
-    setSiteId,
-    setSiteName,
-    setSurveyor,
-    setNotes,
+    setPasses,
     run,
     reset,
   };

@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AssessScreen from './src/screens/AssessScreen';
+import CompareScreen from './src/screens/CompareScreen';
+import BatchScreen from './src/screens/BatchScreen';
 import ModelsScreen from './src/screens/ModelsScreen';
 import AboutScreen from './src/screens/AboutScreen';
 import { useHealth } from './src/hooks/useHealth';
@@ -107,9 +109,17 @@ function AppContent() {
           screenOptions={({ route }) => ({
             tabBarIcon: ({ focused, color, size }) => {
               let iconName;
-              if (route.name === 'Assess') iconName = focused ? 'camera' : 'camera-outline';
-              else if (route.name === 'Models') iconName = focused ? 'cube' : 'cube-outline';
-              else iconName = focused ? 'information-circle' : 'information-circle-outline';
+              if (route.name === 'Assess') {
+                iconName = focused ? 'camera' : 'camera-outline';
+              } else if (route.name === 'Compare') {
+                iconName = focused ? 'git-compare' : 'git-compare-outline';
+              } else if (route.name === 'Batch') {
+                iconName = focused ? 'layers' : 'layers-outline';
+              } else if (route.name === 'Models') {
+                iconName = focused ? 'cube' : 'cube-outline';
+              } else {
+                iconName = focused ? 'information-circle' : 'information-circle-outline';
+              }
               return <Ionicons name={iconName} size={size} color={color} />;
             },
             tabBarActiveTintColor: THEME.primary,
@@ -127,7 +137,7 @@ function AppContent() {
               elevation: 4,
             },
             tabBarLabelStyle: {
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: '500',
             },
             headerStyle: {
@@ -156,6 +166,8 @@ function AppContent() {
           })}
         >
           <Tab.Screen name="Assess" component={AssessScreen} options={{ title: 'Assess' }} />
+          <Tab.Screen name="Compare" component={CompareScreen} options={{ title: 'Compare' }} />
+          <Tab.Screen name="Batch" component={BatchScreen} options={{ title: 'Batch' }} />
           <Tab.Screen name="Models" component={ModelsScreen} options={{ title: 'Models' }} />
           <Tab.Screen name="About" component={AboutScreen} options={{ title: 'About' }} />
         </Tab.Navigator>
